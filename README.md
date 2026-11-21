@@ -6,6 +6,24 @@ crises and keeping your promises. Your choices decide your legacy.
 
 Pure **HTML + CSS + JavaScript** — no build step, no frameworks. Optional **Firebase** online Hall of Fame.
 
+## Real countries
+
+Pick a fictional country or one of 10 real ones: Uzbekistan, Kazakhstan, Türkiye, United States, United Kingdom,
+Germany, France, Japan, India and Brazil. Each uses real data:
+
+- **Population, GDP (IMF 2025, nominal US$) and government debt (% of GDP)**. All money in the game is shown at the
+  real scale of that economy.
+- **Political rules**: the title you run for (President, Prime Minister, Chancellor), term length (7 years in
+  Uzbekistan and Kazakhstan, 4 in the US…), term limits (Kazakhstan: one single term; no limit in parliamentary
+  systems, where the game ends after 3 terms) and the real size of parliament (150 seats in Uzbekistan's
+  Legislative Chamber, 650 in the UK House of Commons…).
+- **Geography**: five regions built from real provinces/states with their population shares, real main cities and
+  landscapes (desert, mountains, coast, farmland, jungle). Landlocked Uzbekistan cannot build seaports or a navy.
+- **Not real on purpose**: parties, candidates and the hostile foreign power are fictional; the map is a stylised
+  5-region layout, not the true border shape; starting stats (health, education…) are rough game estimates.
+
+Edit `COUNTRIES` in `data.js` to add more countries.
+
 ## How to play
 
 **Campaign (8 weeks)**

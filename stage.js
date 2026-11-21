@@ -32,7 +32,7 @@ const Confetti = (() => {
 const Debate = (() => {
   const W = 900, H = 480, XS = [122, 315, 585, 778];
   const MOD_LOOK = { skin: '#c68642', hair: '#d6d3d1', style: 'short', suit: '#3f3f46', tie: '#f8fafc' };
-  let cv = null, ctx = null, raf = 0, lastT = 0, time = 0, scale = 1, dpr = 1;
+  let cv = null, ctx = null, raf = 0, lastT = 0, time = 0, scale = 1, dpr = 1, race = '';
   let cast = [], speaker = -1, bubble = null, meter = 50, meterShown = 50, cheer = null, parts = [], winner = -1, country = '', audience = [], skip = null;
   const imgCache = {};
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -56,13 +56,13 @@ const Debate = (() => {
   function wait(ms) { return new Promise(res => { const t = setTimeout(() => { skip = null; res(); }, ms); skip = () => { clearTimeout(t); skip = null; res(); }; }); }
 
   function open(opts) {
-    country = opts.country; meter = meterShown = 50; winner = -1; parts = []; speaker = -1; bubble = null; cheer = null;
+    country = opts.country; race = opts.race || 'Presidential election'; meter = meterShown = 50; winner = -1; parts = []; speaker = -1; bubble = null; cheer = null;
     cast = opts.cast.map((c, i) => ({ ...c, x: XS[i], color: partyById(c.party).color }));
     cast.push({ name: 'Moderator', role: 'mod', look: MOD_LOOK, x: 450, color: '#64748b' });
     cast.forEach(c => { imgFor(c.look, 0); imgFor(c.look, 1); imgFor(c.look, -1); });
     audience = [];
     for (let r = 0; r < 3; r++) for (let i = 0; i < 23; i++) audience.push({ row: r, x: i * 41 + (r % 2) * 20 - 8 + rand(-4, 4), ph: Math.random() * 6, shade: rand(.75, 1), flag: Math.random() < .18 ? choose([cast[1].color, cast[2].color]) : null });
-    const m = modal(`<div class="debate"><div class="debate-top"><span class="live-dot"></span> LIVE · Presidential debate</div><canvas id="debate-cv" aria-label="Debate stage"></canvas><div id="debate-panel" class="debate-panel"></div></div>`, 'debate-card');
+    const m = modal(`<div class="debate"><div class="debate-top"><span class="live-dot"></span> LIVE · Election debate</div><canvas id="debate-cv" aria-label="Debate stage"></canvas><div id="debate-panel" class="debate-panel"></div></div>`, 'debate-card');
     cv = $('#debate-cv', m); ctx = cv.getContext('2d');
     cv.onclick = () => skip && skip();
     resize();
@@ -99,7 +99,7 @@ const Debate = (() => {
     const sg = ctx.createLinearGradient(290, 26, 610, 174); sg.addColorStop(0, 'rgba(30,58,138,.6)'); sg.addColorStop(1, 'rgba(88,28,135,.5)'); ctx.fillStyle = sg; ctx.fillRect(290, 26, 320, 148);
     circ(306, 42, 4.5, Math.sin(time * 5) > 0 ? '#ef4444' : '#7f1d1d'); text('LIVE', 316, 46, 9, '#fecaca', 800, 'left');
     text('THE GREAT DEBATE', 450, 72, 24, '#fde68a', 800);
-    text(`${country.toUpperCase()} · PRESIDENTIAL ELECTION`, 450, 92, 9, '#cbd5e1', 700);
+    text(`${country.toUpperCase()} · ${race.toUpperCase()}`, 450, 92, 9, '#cbd5e1', 700);
     const p = cast[1], o = cast[2];
     rr(318, 112, 264, 20, 10, o.color); rr(318, 112, Math.max(20, 264 * meterShown / 100), 20, 10, p.color);
     R(318 + 264 * .5 - 1, 108, 2, 28, '#fff');

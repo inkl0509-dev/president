@@ -7,11 +7,12 @@
 'use strict';
 const City = (() => {
   const H = 300, HORIZON = 188, BASE = 244, WALK = 255, ROAD_T = 262, ROAD_B = 294;
-  const FILLERS = { capital: ['townhall', 'shops', 'apartments'], north: ['houses', 'shops'], coast: ['cafe', 'houses'], farm: ['barn', 'houses'], high: ['chalets', 'mine'] };
-  const LOT_W = { housing: 170, hospital: 150, school: 175, airport: 290, port: 250, factory: 155, solar: 185, coal: 135, base: 185, park: 175, site: 160,
+  const FILLERS = { capital: ['townhall', 'shops', 'apartments'], industry: ['houses', 'shops'], coast: ['cafe', 'houses'], farm: ['barn', 'houses'], mountain: ['chalets', 'mine'], desert: ['bazaar', 'houses'], jungle: ['houses', 'barn'] };
+  const themeOf = id => (reg(id) && reg(id).theme) || 'farm';
+  const LOT_W = { bazaar: 150, housing: 170, hospital: 150, school: 175, airport: 290, port: 250, factory: 155, solar: 185, coal: 135, base: 185, park: 175, site: 160,
     townhall: 175, shops: 150, apartments: 120, houses: 150, cafe: 125, barn: 160, chalets: 140, mine: 120 };
-  const FILLER_NAMES = { townhall: '🏛️ Presidential Palace', shops: '🛍️ Shops', apartments: '🏢 Apartments', houses: '🏡 Homes', cafe: '☕ Beach café', barn: '🐄 Family farm', chalets: '🏔️ Mountain homes', mine: '⛏️ Old mine' };
-  const WORK = { workers: ['factory', 'site', 'port', 'coal', 'mine', 'shops'], business: ['shops', 'townhall', 'airport', 'port', 'apartments'], farmers: ['barn', 'solar', 'shops'], youth: ['school', 'park', 'cafe', 'shops'], elderly: ['park', 'hospital', 'shops', 'cafe'] };
+  const FILLER_NAMES = { bazaar: '🧺 Bazaar', townhall: '🏛️ Palace', shops: '🛍️ Shops', apartments: '🏢 Apartments', houses: '🏡 Homes', cafe: '☕ Beach café', barn: '🐄 Family farm', chalets: '🏔️ Mountain homes', mine: '⛏️ Old mine' };
+  const WORK = { workers: ['factory', 'site', 'port', 'coal', 'mine', 'shops', 'bazaar'], business: ['bazaar', 'shops', 'townhall', 'airport', 'port', 'apartments'], farmers: ['barn', 'solar', 'shops'], youth: ['school', 'park', 'cafe', 'shops'], elderly: ['park', 'hospital', 'shops', 'cafe'] };
   const GLOOK = {
     workers: { shirt: '#f97316', pants: '#1e3a8a', hat: 'hard' },
     business: { shirt: '#1f2937', pants: '#111827', hair: '#3b2a1a', brief: true },
@@ -94,7 +95,7 @@ const City = (() => {
     return Math.max(0, Math.min(100, S.ga[g] + (S.regionMods ? S.regionMods[region] * .5 : 0)));
   }
   const lotAt = x => lots.find(l => x >= l.x && x <= l.x + l.w);
-  function lotName(l) { return l.type === 'site' ? `🚧 ${PROJECTS[l.p.type].name}` : PROJECTS[l.type] ? `${PROJECTS[l.type].icon} ${PROJECTS[l.type].name}` : FILLER_NAMES[l.type]; }
+  function lotName(l) { if (l.type === 'townhall') return '🏛️ ' + ROLE.palace; return l.type === 'site' ? `🚧 ${PROJECTS[l.p.type].name}` : PROJECTS[l.type] ? `${PROJECTS[l.type].icon} ${PROJECTS[l.type].name}` : FILLER_NAMES[l.type]; }
 
   // ---------- scene setup ----------
   function signature() {
@@ -115,7 +116,7 @@ const City = (() => {
     const bl = S.buildings[region] || [];
     const sites = (S.projects || []).filter(p => p.region === region);
     highway = bl.includes('highway');
-    const fill = FILLERS[region];
+    const fill = FILLERS[themeOf(region)] || FILLERS.farm;
     const main = bl.filter(b => b !== 'highway').sort((a, b) => (a === 'airport' ? -1 : 0) - (b === 'airport' ? -1 : 0));
     const order = [{ type: fill[0] }, ...main.map(t => ({ type: t })), ...sites.map(p => ({ type: 'site', p })), ...fill.slice(1).map(t => ({ type: t }))];
     const pi = order.findIndex(o => o.type === 'port'); if (pi >= 0) order.push(order.splice(pi, 1)[0]);
@@ -278,7 +279,7 @@ const City = (() => {
       fund: ['Thank you for your support!', 'Every dollar counts!', 'Cheers, everyone!'],
       door: ['Hi! Can I count on your vote?', `I'm ${first} — nice to meet you!`],
     };
-    ev = { type, t0: time, dur: type === 'door' ? 7 : 10, x, data, region, lines: L[type] || ['Hello!'], stage: type === 'rally' || type === 'promise', pc, first, last: last.toUpperCase(), chant: `${first} for president!` };
+    ev = { type, t0: time, dur: type === 'door' ? 7 : 10, x, data, region, lines: L[type] || ['Hello!'], stage: type === 'rally' || type === 'promise', pc, first, last: last.toUpperCase(), chant: `${first} for ${ROLE.title.toLowerCase()}!` };
     if (type === 'door') {
       const homes = lots.filter(l => ['houses', 'apartments', 'chalets', 'housing', 'barn'].includes(l.type));
       const l = homes.sort((a, b) => Math.abs(a.x + a.w / 2 - x) - Math.abs(b.x + b.w / 2 - x))[0] || lots[0];
@@ -361,12 +362,12 @@ const City = (() => {
     people.forEach(p => { if (p.cx != null) { R(p.cx - 5, WALK - 9, 11, 2, '#78350f'); R(p.cx - 5, WALK - 9, 1.5, 9, '#78350f'); R(p.cx + 4.5, WALK - 9, 1.5, 9, '#78350f'); R(p.cx - (p.dir > 0 ? 6 : -4.5), WALK - 18, 1.5, 10, '#78350f'); } });
   }
   function drawEventBack() {
-    if (oppStage) stageAt(oppStage.x, partyById(S.opp.party).color, `${S.opp.name.split(' ').slice(-1)[0].toUpperCase()} FOR PRESIDENT`, false);
+    if (oppStage) stageAt(oppStage.x, partyById(S.opp.party).color, `${S.opp.name.split(' ').slice(-1)[0].toUpperCase()} FOR ${ROLE.upper}`, false);
     if (!ev) return;
     const e = ev;
     if (e.stage) {
       [e.x - 112, e.x + 112].forEach(lx => { R(lx - 2, BASE - 130, 4, 130, '#334155'); R(lx - 7, BASE - 136, 14, 8, '#111827'); });
-      stageAt(e.x, e.pc, e.type === 'promise' ? `I PROMISE: ${e.data.text.toUpperCase()}` : `${e.last} FOR PRESIDENT`, true);
+      stageAt(e.x, e.pc, e.type === 'promise' ? `I PROMISE: ${e.data.text.toUpperCase()}` : `${e.last} FOR ${ROLE.upper}`, true);
       for (let i = 0; i < 7; i++) { const bx = e.x - 96 + i * 32, by = BASE - 130 - ((time * 14 + i * 23) % 90); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = .6; line(bx, by + 8, bx + Math.sin(time + i) * 2, by + 22); ctx.fillStyle = i % 2 ? e.pc : '#ffffff'; ctx.beginPath(); ctx.ellipse(bx, by, 5, 6.5, 0, 0, Math.PI * 2); ctx.fill(); }
     }
     if (e.type === 'tv' || e.type === 'attack') billboard(e.x, e.type === 'attack');
@@ -411,11 +412,11 @@ const City = (() => {
   }
   function drawBackground() {
     const W = worldW;
-    switch (region) {
+    switch (themeOf(region)) {
       case 'capital':
         for (let i = 0; i * 34 < W; i++) { const h = 40 + hash(i) * 70; R(i * 34, HORIZON - h, 28, h + 10, 'rgba(100,122,160,.55)'); for (let j = 0; j < h / 10 - 1; j++) if (hash(i * 3 + j) > .55) R(i * 34 + 6 + (j % 2) * 10, HORIZON - h + 6 + j * 10, 4, 4, 'rgba(255,240,180,.6)'); }
         break;
-      case 'north':
+      case 'industry':
         for (let i = 0; i * 140 < W + 140; i++) poly([i * 140 - 40, HORIZON, i * 140 + 40, HORIZON - 70 - hash(i) * 30, i * 140 + 140, HORIZON], 'rgba(90,100,120,.65)');
         for (let i = 0; i * 180 < W; i++) { R(i * 180 + 60, HORIZON - 55, 8, 55, 'rgba(70,75,90,.7)'); R(i * 180 + 40, HORIZON - 22, 50, 22, 'rgba(70,75,90,.7)'); }
         break;
@@ -429,14 +430,25 @@ const City = (() => {
         for (let i = 0; i * 160 < W + 160; i++) { ctx.fillStyle = i % 2 ? '#9acd52' : '#c5d86d'; ctx.beginPath(); ctx.ellipse(i * 160, HORIZON + 4, 120, 34, 0, Math.PI, 0); ctx.fill(); }
         for (let i = 0; i * 90 < W; i++) R(i * 90, HORIZON - 3, 80, 4, i % 2 ? '#eab308' : '#84cc16');
         break;
-      case 'high':
+      case 'desert':
+        for (let i = 0; i * 150 < W + 150; i++) { ctx.fillStyle = i % 2 ? '#e8c98a' : '#dcb877'; ctx.beginPath(); ctx.ellipse(i * 150, HORIZON + 6, 130, 30, 0, Math.PI, 0); ctx.fill(); }
+        for (let i = 0; i * 240 < W; i++) { const x = i * 240 + 60; R(x, HORIZON - 46, 22, 46, 'rgba(56,189,248,.55)'); ctx.fillStyle = 'rgba(14,116,144,.6)'; ctx.beginPath(); ctx.arc(x + 11, HORIZON - 46, 11, Math.PI, 0); ctx.fill(); R(x + 28, HORIZON - 62, 7, 62, 'rgba(194,120,60,.7)'); }
+        for (let i = 0; i * 120 < W; i++) { const x = i * 120 + 30; R(x - 1, HORIZON - 22, 3, 22, '#7c5a2a'); ctx.strokeStyle = '#3f7d20'; ctx.lineWidth = 2; for (let k = 0; k < 5; k++) line(x, HORIZON - 22, x + Math.cos(k * 1.2 + 3.6) * 10, HORIZON - 22 + Math.sin(k * 1.2 + 3.6) * 6); }
+        break;
+      case 'jungle':
+        for (let i = 0; i * 30 < W + 30; i++) { const x = i * 30, h = 50 + hash(i) * 40; R(x + 12, HORIZON - h * .4, 4, h * .4, '#3f2a14'); circ(x + 14, HORIZON - h * .45, 18 + hash(i + 3) * 8, i % 2 ? '#166534' : '#15803d'); }
+        R(0, HORIZON - 4, W, 8, '#3b82a6');
+        break;
+      case 'mountain':
         for (let i = 0; i * 170 < W + 170; i++) { const hh = 100 + hash(i) * 50, cx = i * 170 + 40; poly([cx - 110, HORIZON, cx, HORIZON - hh, cx + 110, HORIZON], 'rgba(100,116,139,.8)'); poly([cx - 24, HORIZON - hh + 24, cx, HORIZON - hh, cx + 24, HORIZON - hh + 24, cx + 8, HORIZON - hh + 20, cx - 6, HORIZON - hh + 28], '#f8fafc'); }
         for (let i = 0; i * 26 < W; i++) { const x = i * 26 + hash(i) * 10; poly([x - 7, HORIZON + 2, x, HORIZON - 20, x + 7, HORIZON + 2], '#166534'); }
         break;
     }
   }
   function drawGround() {
-    R(0, HORIZON, worldW, BASE - HORIZON, lerpColor('#b4a26a', '#5fbf5a', env));
+    const th = themeOf(region); R(0, HORIZON, worldW, BASE - HORIZON, th === 'desert' ? lerpColor('#c9a86a', '#d9c08a', env) : th === 'jungle' ? lerpColor('#8a9a4a', '#2f9e44', env) : lerpColor('#b4a26a', '#5fbf5a', env));
+    if (th === 'desert') { for (let i = 0; i * 64 < worldW; i++) if (hash(i * 3) < .5) { const x = i * 64; R(x, HORIZON + 22, 2, 8, '#65a30d'); R(x - 3, HORIZON + 24, 2, 4, '#65a30d'); R(x + 3, HORIZON + 23, 2, 4, '#65a30d'); } }
+    else
     for (let i = 0; i * 48 < worldW; i++) if (hash(i * 5) < env + .1) tree(i * 48 + hash(i) * 20, HORIZON + 22, .8, leaf());
     if (highway) {
       for (let x = 30; x < worldW; x += 110) R(x, HORIZON - 8, 8, BASE - HORIZON + 8, '#9ca3af');
@@ -492,6 +504,13 @@ const City = (() => {
         text(names[i], x + 23, BASE - h + 7, 6, '#334155');
       }
       return BASE - 58;
+    },
+    bazaar(l) {
+      const cols = ['#f97316', '#0ea5e9', '#16a34a', '#e11d48'];
+      R(l.x + 4, BASE - 40, l.w - 8, 40, '#e7c79a'); poly([l.x, BASE - 40, l.x + l.w / 2, BASE - 62, l.x + l.w, BASE - 40], '#0e7490');
+      ctx.fillStyle = '#22d3ee'; ctx.beginPath(); ctx.arc(l.x + l.w / 2, BASE - 58, 12, Math.PI, 0); ctx.fill();
+      for (let i = 0; i < 4; i++) { const x = l.x + 10 + i * 34; R(x, BASE - 26, 28, 26, '#fef3c7'); for (let s2 = 0; s2 < 4; s2++) R(x + s2 * 7, BASE - 30, 7, 6, s2 % 2 ? '#fff' : cols[i]); circ(x + 8, BASE - 10, 3, '#f59e0b'); circ(x + 15, BASE - 9, 3, '#ef4444'); circ(x + 22, BASE - 10, 3, '#84cc16'); }
+      return BASE - 72;
     },
     apartments(l) {
       R(l.x + 6, BASE - 112, 52, 112, '#94a3b8'); windows(l.x + 6, BASE - 106, 52, 100, 4, 9, .45, l.x);
@@ -730,7 +749,7 @@ const City = (() => {
   }
   function drawPrez() {
     const p = prez; if (!p) return;
-    drawCandidate(S.player.look, mood(), p.x, p.onStage ? BASE - 20 : WALK + 2, p.walking, p.phase, p.dir, camp() ? '★ YOU' : '★ PRESIDENT', 'rgba(251,191,36,.95)');
+    drawCandidate(S.player.look, mood(), p.x, p.onStage ? BASE - 20 : WALK + 2, p.walking, p.phase, p.dir, camp() ? '★ YOU' : '★ ' + ROLE.upper, 'rgba(251,191,36,.95)');
   }
   function drawBubble(x, y, t) {
     ctx.font = '600 8px Inter, system-ui, sans-serif';
@@ -784,7 +803,7 @@ const City = (() => {
     const tip = document.getElementById('cv-tip'); if (!tip) return;
     const rect = cv.getBoundingClientRect(), wx = (e.clientX - rect.left) / scale + cam, wy = (e.clientY - rect.top) / scale;
     let html = '';
-    if (prez && Math.abs(prez.x - wx) < 14 && wy > (prez.onStage ? BASE - 82 : WALK - 62) && wy < WALK + 4) html = `<b>★ ${camp() ? 'Candidate' : 'President'} ${esc(S.player.name)}</b><br>${ev ? 'Campaigning here!' : `Visiting ${prez.lot ? lotName(prez.lot) : 'the city'}`}`;
+    if (prez && Math.abs(prez.x - wx) < 14 && wy > (prez.onStage ? BASE - 82 : WALK - 62) && wy < WALK + 4) html = `<b>★ ${camp() ? 'Candidate' : ROLE.title} ${esc(S.player.name)}</b><br>${ev ? 'Campaigning here!' : `Visiting ${prez.lot ? lotName(prez.lot) : 'the city'}`}`;
     if (!html) {
       const p = people.filter(q => q.state !== 'inside' && Math.abs(q.x - wx) < 7 * (q.size || 1) && wy > q.y - 36 * (q.size || 1) && wy < q.y + 3).sort((a, b) => b.y - a.y)[0];
       if (p) {

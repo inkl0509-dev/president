@@ -37,23 +37,23 @@ const OPP_NAMES = ['Victor Hale', 'Elena Marsh', 'Gregor Stein', 'Amara Okafor',
 
 // Map: viewBox 0 0 400 300. pop = electoral votes (total 100, need 51).
 const REGIONS = [
-  { id: 'capital', city: [215,128,'Veloria'], name: 'Capital District', short: 'Capital', pop: 22,
+  { id: 'capital', theme: 'capital', coast: false, city: [215,128,'Veloria'], name: 'Capital District', short: 'Capital', pop: 22,
     desc: 'Universities, ministries and young professionals. Trend-setters.',
     mix: { workers: .20, business: .22, farmers: 0, youth: .38, elderly: .20 },
     pts: [[160,120],[250,105],[270,170],[190,190],[110,160]] },
-  { id: 'north', city: [300,52,'Ironvale'], name: 'Industrial North', short: 'North', pop: 24,
+  { id: 'north', theme: 'industry', coast: true, city: [300,52,'Ironvale'], name: 'Industrial North', short: 'North', pop: 24,
     desc: 'Steel mills, car plants and strong unions. Jobs come first.',
     mix: { workers: .50, business: .08, farmers: .05, youth: .20, elderly: .17 },
     pts: [[150,35],[270,25],[350,60],[250,105],[160,120]] },
-  { id: 'coast', city: [343,104,'Port Azure'], name: 'Coastal Ports', short: 'Coast', pop: 20,
+  { id: 'coast', theme: 'coast', coast: true, city: [343,104,'Port Azure'], name: 'Coastal Ports', short: 'Coast', pop: 20,
     desc: 'Busy harbours, trade and tourism. Open to the world.',
     mix: { workers: .30, business: .15, farmers: .05, youth: .30, elderly: .20 },
     pts: [[350,60],[370,140],[340,220],[270,170],[250,105]] },
-  { id: 'farm', city: [128,238,'Goldfield'], name: 'Southern Farmlands', short: 'Farmlands', pop: 18,
+  { id: 'farm', theme: 'farm', coast: false, city: [128,238,'Goldfield'], name: 'Southern Farmlands', short: 'Farmlands', pop: 18,
     desc: 'Wheat, cotton and orchards. Traditional and proud.',
     mix: { workers: .15, business: .05, farmers: .45, youth: .12, elderly: .23 },
     pts: [[70,230],[150,265],[260,270],[340,220],[270,170],[190,190],[110,160]] },
-  { id: 'high', city: [78,80,'Stonecrest'], name: 'Western Highlands', short: 'Highlands', pop: 16,
+  { id: 'high', theme: 'mountain', coast: false, city: [78,80,'Stonecrest'], name: 'Western Highlands', short: 'Highlands', pop: 16,
     desc: 'Mountain towns, mines and retirees. Hard to win over.',
     mix: { workers: .25, business: .05, farmers: .25, youth: .15, elderly: .30 },
     pts: [[30,110],[60,50],[150,35],[160,120],[110,160],[70,230]] },
@@ -394,7 +394,7 @@ const SPEECH_LINES = {
 };
 
 // ---------- country building ----------
-const NEIGHBOR = 'Draskor Federation';
+let NEIGHBOR = 'Draskor Federation';
 
 // Roads between cities (region ids)
 const ROADS = [['capital','north'],['capital','coast'],['capital','farm'],['capital','high'],['north','coast'],['farm','coast'],['high','north'],['high','farm']];
@@ -410,7 +410,7 @@ const PROJECTS = {
   school:   { name: 'School & college',   icon: '🏫', cost: 2, turns: 2, max: 2, desc: 'Better education', fx: { s: { education: 4 }, g: { youth: 2 } } },
   highway:  { name: 'Highway',            icon: '🛣️', cost: 4, turns: 3, max: 1, desc: 'Faster trade, happier farmers', fx: { s: { economy: 3 }, g: { farmers: 2, business: 1 } } },
   airport:  { name: 'Airport',            icon: '✈️', cost: 8, turns: 4, max: 1, desc: 'Tourism, trade and business', fx: { s: { economy: 5 }, g: { business: 3, youth: 1 } } },
-  port:     { name: 'Seaport',            icon: '⚓', cost: 6, turns: 3, max: 1, only: ['coast', 'north'], desc: 'Shipping & exports (coast only)', fx: { s: { economy: 5 }, g: { workers: 2, business: 2 } } },
+  port:     { name: 'Seaport',            icon: '⚓', cost: 6, turns: 3, max: 1, desc: 'Shipping & exports (coastal regions only)', fx: { s: { economy: 5 }, g: { workers: 2, business: 2 } } },
   factory:  { name: 'Industrial park',    icon: '🏭', cost: 4, turns: 2, max: 2, desc: 'Jobs! But more pollution', fx: { s: { economy: 4, environment: -4 }, g: { workers: 3 } } },
   solar:    { name: 'Solar & wind farm',  icon: '☀️', cost: 4, turns: 2, max: 2, desc: '+15 clean energy', fx: { s: { environment: 2 }, g: { youth: 1 } } },
   coal:     { name: 'Coal power plant',   icon: '⚡', cost: 3, turns: 2, max: 1, desc: '+22 energy, dirty', fx: { s: { environment: -6 }, g: { workers: 1 } } },
@@ -461,7 +461,7 @@ GOV_EVENTS.push(
       { t: 'Refuse and report him', fx: { g: { youth: 3 }, s: { freedom: 2 } }, news: 'President exposes bribery attempt' },
     ] },
   { id: 'spy', icon: '🕶️', title: 'Spy caught!',
-    text: `Police arrest an agent of the ${NEIGHBOR} photographing a military base.`,
+    text: 'Police arrest an agent of the {NEIGHBOR} photographing a military base.',
     choices: [
       { t: 'Expel their diplomats', fx: { g: { elderly: 3 }, threat: 8 }, news: 'Diplomats expelled over spy scandal' },
       { t: 'Quiet prisoner swap', fx: { threat: -5 }, news: 'Spy quietly sent home' },
@@ -482,3 +482,131 @@ const DEBATE_LINES = {
   green: ['There is no planet B!', 'Clean energy means good jobs!', 'We need action, not words!'],
   lib:   ['Get the government out of your way!', 'Freedom and opportunity for all!', 'Less bureaucracy, more freedom!'],
 };
+
+/* ============================================================
+   REAL COUNTRIES
+   Population, GDP (IMF 2025, nominal US$) and government debt (% of GDP)
+   are real figures. Term length, term limits and parliament size follow
+   each country's rules. Regions are groups of real provinces/states with
+   approximate population shares. Starting stats are rough game estimates.
+   Parties and candidates are always fictional.
+   region: [name, short, main city, % of population, theme, coastal?, mix(workers,business,farmers,youth,seniors), description]
+   ============================================================ */
+const _r = (name, short, city, pop, theme, coast, m, desc) => ({ name, short, city, pop, theme, coast, desc,
+  mix: { workers: m[0], business: m[1], farmers: m[2], youth: m[3], elderly: m[4] } });
+const COUNTRIES = [
+  { id: 'veloria', name: 'Republic of Veloria', flag: '🏳️', fictional: true, system: 'presidential', title: 'President', termYears: 4, termLimit: 2,
+    seats: 100, parl: 'National Assembly', pop: 24, gdp: 100, debt: 55, rate: .015, landlocked: false, infra: 40,
+    note: 'A fictional country — type any name you like.' },
+  { id: 'uz', name: 'Uzbekistan', flag: '🇺🇿', system: 'presidential', title: 'President', termYears: 7, termLimit: 2,
+    seats: 150, parl: 'Legislative Chamber (Oliy Majlis)', pop: 38.4, gdp: 147, debt: 31, rate: .015, landlocked: true, infra: 38,
+    stats: { economy: 62, health: 52, education: 56, security: 55, environment: 42, freedom: 60, housing: 46 }, mil: { army: 40, air: 25, navy: 0 },
+    note: 'Doubly landlocked — no seaports or navy. 7-year presidential terms.',
+    regions: {
+      capital: _r('Tashkent city & region', 'Tashkent', 'Tashkent', 17, 'capital', false, [.30, .20, .05, .30, .15], 'The capital: government, business, universities and the metro.'),
+      north: _r('Fergana Valley', 'Fergana', 'Namangan', 28, 'industry', false, [.38, .05, .22, .22, .13], 'Andijan, Fergana and Namangan — the most densely populated valley, car plants and cotton.'),
+      coast: _r('Karakalpakstan, Khorezm, Bukhara & Navoi', 'West', 'Bukhara', 19, 'desert', false, [.30, .05, .30, .18, .17], 'Desert and oases: the Aral Sea region, ancient Khiva and Bukhara, mining in Navoi.'),
+      farm: _r('Samarkand, Jizzakh & Syrdarya', 'Samarkand', 'Samarkand', 18, 'farm', false, [.22, .05, .35, .20, .18], 'Fertile plains, tourism on the Silk Road and the biggest region by population.'),
+      high: _r('Kashkadarya & Surkhandarya', 'South', 'Qarshi', 18, 'mountain', false, [.25, .04, .33, .20, .18], 'Mountains, gas fields and the southern border at Termez.'),
+    } },
+  { id: 'kz', name: 'Kazakhstan', flag: '🇰🇿', system: 'presidential', title: 'President', termYears: 7, termLimit: 1,
+    seats: 98, parl: 'Mazhilis', pop: 20.4, gdp: 306, debt: 24.6, rate: .015, landlocked: false, infra: 48,
+    stats: { economy: 58, health: 55, education: 60, security: 55, environment: 44, freedom: 60, housing: 50 }, mil: { army: 35, air: 25, navy: 10 },
+    note: 'One single 7-year presidential term. Ports only on the Caspian Sea.',
+    regions: {
+      capital: _r('Astana & Akmola', 'Astana', 'Astana', 12, 'capital', false, [.25, .22, .08, .30, .15], 'The modern capital on the steppe.'),
+      north: _r('North & East (Karaganda, Pavlodar, East Kazakhstan)', 'North-East', 'Karaganda', 25, 'industry', false, [.45, .06, .14, .15, .20], 'Coal, steel and metals — the industrial heartland.'),
+      coast: _r('West (Atyrau, Mangystau, Aktobe)', 'West', 'Aktau', 15, 'desert', true, [.42, .10, .08, .25, .15], 'Oil and gas on the Caspian Sea.'),
+      farm: _r('South (Shymkent, Turkistan, Zhambyl, Kyzylorda)', 'South', 'Shymkent', 27, 'farm', false, [.25, .05, .32, .25, .13], 'Young, fast-growing and agricultural.'),
+      high: _r('Almaty city & region', 'Almaty', 'Almaty', 21, 'mountain', false, [.25, .20, .10, .30, .15], 'The largest city, business hub, under the Tian Shan mountains.'),
+    } },
+  { id: 'tr', name: 'Türkiye', flag: '🇹🇷', system: 'presidential', title: 'President', termYears: 5, termLimit: 2,
+    seats: 600, parl: 'Grand National Assembly', pop: 86, gdp: 1603, debt: 22.5, rate: .03, landlocked: false, infra: 60,
+    stats: { economy: 55, health: 62, education: 56, security: 55, environment: 50, freedom: 60, housing: 46 }, mil: { army: 60, air: 50, navy: 45 },
+    note: '5-year presidential terms, two-term limit.',
+    regions: {
+      capital: _r('Central Anatolia', 'Central', 'Ankara', 15, 'capital', false, [.28, .15, .17, .25, .15], 'Ankara, the capital, on the Anatolian plateau.'),
+      north: _r('Marmara', 'Marmara', 'Istanbul', 31, 'industry', true, [.38, .17, .03, .27, .15], 'Istanbul and Bursa — industry, finance and the Bosphorus.'),
+      coast: _r('Aegean & Mediterranean', 'Aegean', 'İzmir', 25, 'coast', true, [.28, .12, .18, .24, .18], 'Ports, tourism and olive groves.'),
+      farm: _r('Black Sea', 'Black Sea', 'Samsun', 10, 'farm', true, [.20, .05, .35, .18, .22], 'Tea, hazelnuts and green hills.'),
+      high: _r('Eastern & Southeastern Anatolia', 'East', 'Diyarbakır', 19, 'mountain', false, [.25, .05, .30, .30, .10], 'Mountains, rivers and a very young population.'),
+    } },
+  { id: 'us', name: 'United States', flag: '🇺🇸', system: 'presidential', title: 'President', termYears: 4, termLimit: 2,
+    seats: 435, parl: 'House of Representatives', pop: 342, gdp: 30861, debt: 126.8, rate: .017, landlocked: false, infra: 78,
+    stats: { economy: 58, health: 64, education: 70, security: 55, environment: 52, freedom: 60, housing: 48 }, mil: { army: 70, air: 85, navy: 85 },
+    note: '4-year presidential terms, two-term limit. Real electoral college has 538 votes; here regions are grouped.',
+    regions: {
+      capital: _r('Northeast & D.C.', 'Northeast', 'Washington', 17, 'capital', true, [.25, .22, .03, .27, .23], 'Washington, New York and Boston — politics and finance.'),
+      north: _r('Midwest', 'Midwest', 'Chicago', 21, 'industry', false, [.38, .10, .14, .20, .18], 'Factories and farms of the heartland.'),
+      coast: _r('Pacific Coast', 'Pacific', 'Los Angeles', 16, 'coast', true, [.25, .20, .06, .32, .17], 'California tech, Hollywood and Pacific ports.'),
+      farm: _r('South', 'South', 'Houston', 38, 'farm', true, [.30, .14, .12, .26, .18], 'The biggest and fastest-growing region.'),
+      high: _r('Mountain West', 'Mountain', 'Denver', 8, 'mountain', false, [.27, .13, .15, .27, .18], 'Rockies, deserts and booming cities.'),
+    } },
+  { id: 'uk', name: 'United Kingdom', flag: '🇬🇧', system: 'parliamentary', title: 'Prime Minister', termYears: 5, termLimit: 0,
+    seats: 650, parl: 'House of Commons', pop: 69.5, gdp: 4012, debt: 102, rate: .015, landlocked: false, infra: 72,
+    stats: { economy: 50, health: 70, education: 72, security: 55, environment: 60, freedom: 60, housing: 40 }, mil: { army: 45, air: 50, navy: 55 },
+    note: 'Parliamentary system — elections at least every 5 years, no term limit (game ends after 3 terms).',
+    regions: {
+      capital: _r('London', 'London', 'London', 13, 'capital', true, [.25, .25, .01, .32, .17], 'The capital and a global finance centre.'),
+      north: _r('North of England', 'North', 'Manchester', 23, 'industry', true, [.40, .08, .05, .25, .22], 'Former industrial heartland of Manchester, Leeds and Newcastle.'),
+      coast: _r('South of England & Wales', 'South', 'Bristol', 27, 'coast', true, [.27, .15, .08, .23, .27], 'Ports, coasts and commuter towns.'),
+      farm: _r('Midlands & East', 'Midlands', 'Birmingham', 26, 'farm', true, [.34, .10, .12, .24, .20], 'Birmingham, manufacturing and East Anglian farms.'),
+      high: _r('Scotland & Northern Ireland', 'Scotland & NI', 'Edinburgh', 11, 'mountain', true, [.30, .10, .10, .25, .25], 'Highlands, whisky and North Sea energy.'),
+    } },
+  { id: 'de', name: 'Germany', flag: '🇩🇪', system: 'parliamentary', title: 'Chancellor', termYears: 4, termLimit: 0,
+    seats: 630, parl: 'Bundestag', pop: 83.5, gdp: 5116, debt: 64.6, rate: .012, landlocked: false, infra: 78,
+    stats: { economy: 46, health: 72, education: 72, security: 55, environment: 62, freedom: 60, housing: 50 }, mil: { army: 40, air: 40, navy: 30 },
+    note: 'Parliamentary system — the Chancellor is chosen by the Bundestag; no term limit (game ends after 3 terms).',
+    regions: {
+      capital: _r('Berlin & the East', 'Berlin & East', 'Berlin', 18, 'capital', false, [.30, .14, .06, .24, .26], 'Berlin, Saxony, Brandenburg and Thuringia.'),
+      north: _r('North Rhine-Westphalia', 'NRW', 'Cologne', 22, 'industry', false, [.40, .15, .03, .22, .20], 'The Ruhr — Germany\'s most populous state and industrial core.'),
+      coast: _r('Northern Germany', 'North', 'Hamburg', 18, 'coast', true, [.30, .15, .10, .21, .24], 'Hamburg, Bremen and the North and Baltic Sea coasts.'),
+      farm: _r('Southwest & Centre', 'Southwest', 'Frankfurt', 26, 'farm', false, [.32, .20, .08, .21, .19], 'Frankfurt finance, car makers and wine country.'),
+      high: _r('Bavaria', 'Bavaria', 'Munich', 16, 'mountain', false, [.30, .18, .10, .22, .20], 'Munich, the Alps and high-tech industry.'),
+    } },
+  { id: 'fr', name: 'France', flag: '🇫🇷', system: 'presidential', title: 'President', termYears: 5, termLimit: 2,
+    seats: 577, parl: 'National Assembly', pop: 68.6, gdp: 3383, debt: 118.5, rate: .015, landlocked: false, infra: 75,
+    stats: { economy: 48, health: 74, education: 68, security: 55, environment: 64, freedom: 60, housing: 50 }, mil: { army: 50, air: 55, navy: 55 },
+    note: '5-year presidential terms, two consecutive terms maximum.',
+    regions: {
+      capital: _r('Île-de-France', 'Paris', 'Paris', 18, 'capital', false, [.25, .25, .01, .32, .17], 'Paris and its suburbs.'),
+      north: _r('North & East', 'North-East', 'Lille', 21, 'industry', true, [.38, .10, .12, .20, .20], 'Lille, Strasbourg and old industrial basins.'),
+      coast: _r('West & Atlantic', 'West', 'Bordeaux', 29, 'coast', true, [.27, .12, .16, .20, .25], 'Brittany, Normandy, the Loire and Bordeaux.'),
+      farm: _r('Occitanie', 'South-West', 'Toulouse', 11, 'farm', true, [.25, .12, .20, .22, .21], 'Toulouse aerospace, vineyards and farms.'),
+      high: _r('South-East & the Alps', 'South-East', 'Lyon', 21, 'mountain', true, [.30, .15, .08, .24, .23], 'Lyon, Marseille and the Alps.'),
+    } },
+  { id: 'jp', name: 'Japan', flag: '🇯🇵', system: 'parliamentary', title: 'Prime Minister', termYears: 4, termLimit: 0,
+    seats: 465, parl: 'House of Representatives', pop: 123.3, gdp: 4453, debt: 199.4, rate: .005, landlocked: false, infra: 85,
+    stats: { economy: 48, health: 82, education: 76, security: 55, environment: 60, freedom: 60, housing: 60 }, mil: { army: 40, air: 50, navy: 60 },
+    note: 'Very high debt but very low interest rates. Parliamentary system, no term limit (game ends after 3 terms).',
+    regions: {
+      capital: _r('Kantō', 'Kantō', 'Tokyo', 35, 'capital', true, [.28, .22, .02, .24, .24], 'Tokyo and Yokohama — the world\'s largest metro area.'),
+      north: _r('Tōhoku & Hokkaidō', 'North', 'Sapporo', 11, 'mountain', true, [.24, .07, .22, .15, .32], 'Snowy north, rice, fishing and an ageing population.'),
+      coast: _r('Kansai', 'Kansai', 'Osaka', 17, 'coast', true, [.32, .16, .04, .20, .28], 'Osaka, Kyoto and Kobe.'),
+      farm: _r('Western Japan (Kyūshū, Chūgoku, Shikoku)', 'West', 'Fukuoka', 20, 'farm', true, [.28, .10, .16, .18, .28], 'Fukuoka, Hiroshima and island farms.'),
+      high: _r('Chūbu', 'Chūbu', 'Nagoya', 17, 'industry', true, [.38, .14, .08, .18, .22], 'Nagoya car industry and the Japanese Alps.'),
+    } },
+  { id: 'in', name: 'India', flag: '🇮🇳', system: 'parliamentary', title: 'Prime Minister', termYears: 5, termLimit: 0,
+    seats: 543, parl: 'Lok Sabha', pop: 1464, gdp: 3909, debt: 83.1, rate: .02, landlocked: false, infra: 42,
+    stats: { economy: 64, health: 46, education: 46, security: 55, environment: 34, freedom: 60, housing: 40 }, mil: { army: 65, air: 55, navy: 50 },
+    note: 'Parliamentary system, 5-year Lok Sabha terms, no term limit (game ends after 3 terms).',
+    regions: {
+      capital: _r('North (Delhi, Uttar Pradesh, Punjab, Haryana)', 'North', 'New Delhi', 24, 'capital', false, [.28, .10, .28, .24, .10], 'Delhi and the Gangetic plain.'),
+      north: _r('East & Northeast', 'East', 'Kolkata', 26, 'farm', true, [.28, .07, .35, .22, .08], 'Bihar, West Bengal, Odisha and the Northeast.'),
+      coast: _r('West (Maharashtra, Gujarat, Goa)', 'West', 'Mumbai', 15, 'coast', true, [.34, .18, .18, .20, .10], 'Mumbai finance, Gujarat industry and big ports.'),
+      farm: _r('Central (Madhya Pradesh, Rajasthan, Chhattisgarh)', 'Central', 'Jaipur', 14, 'desert', false, [.24, .06, .42, .20, .08], 'Farms, forests and the Thar desert.'),
+      high: _r('South (Karnataka, Tamil Nadu, Andhra, Telangana, Kerala)', 'South', 'Bengaluru', 21, 'industry', true, [.34, .16, .18, .20, .12], 'Tech hubs, factories and ports.'),
+    } },
+  { id: 'br', name: 'Brazil', flag: '🇧🇷', system: 'presidential', title: 'President', termYears: 4, termLimit: 2,
+    seats: 513, parl: 'Chamber of Deputies', pop: 213, gdp: 2280, debt: 97, rate: .025, landlocked: false, infra: 52,
+    stats: { economy: 50, health: 56, education: 50, security: 55, environment: 56, freedom: 60, housing: 44 }, mil: { army: 40, air: 30, navy: 35 },
+    note: '4-year presidential terms, two consecutive terms maximum. High interest rates.',
+    regions: {
+      capital: _r('Centre-West', 'Centre-West', 'Brasília', 8, 'capital', false, [.22, .14, .28, .24, .12], 'Brasília and the soy and cattle frontier.'),
+      north: _r('Southeast', 'Southeast', 'São Paulo', 42, 'industry', true, [.36, .18, .05, .24, .17], 'São Paulo and Rio — the economic engine.'),
+      coast: _r('Northeast', 'Northeast', 'Salvador', 27, 'coast', true, [.30, .07, .25, .25, .13], 'Beaches, sugar cane and a young population.'),
+      farm: _r('South', 'South', 'Porto Alegre', 15, 'farm', true, [.30, .12, .22, .18, .18], 'Farms, wine and industry.'),
+      high: _r('North (Amazon)', 'Amazon', 'Manaus', 8, 'jungle', true, [.28, .06, .30, .28, .08], 'The Amazon rainforest and Manaus free-trade zone.'),
+    } },
+];
+const VELORIA_REGIONS = REGIONS.map(r => ({ ...r, mix: { ...r.mix } }));

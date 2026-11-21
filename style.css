@@ -302,6 +302,24 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
 .mini small { display: block; font-size: .68rem; }
 #confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 90; }
 
+/* country picker */
+.country-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .4rem; margin-bottom: .6rem; }
+.country { display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; text-align: left; background: var(--card2); border: 2px solid var(--line); border-radius: 10px; padding: .45rem .55rem; }
+.country .cflag { font-size: 1.3rem; } .country b { font-size: .82rem; } .country small { color: var(--muted); font-size: .7rem; }
+.country.on { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(251,191,36,.2); }
+.cfacts { background: #0b1427; border: 1px solid var(--line); border-radius: 12px; padding: .7rem .85rem; font-size: .85rem; margin-bottom: .8rem; }
+.cfacts ul { margin: .4rem 0; padding-left: 1.1rem; line-height: 1.6; }
+
+/* action bar under the city view */
+.citycard { scroll-margin-top: 64px; }
+.cv-bar { display: flex; flex-wrap: wrap; gap: .4rem; align-items: stretch; margin-top: .6rem; }
+.cvb-info { display: flex; flex-direction: column; justify-content: center; gap: .15rem; padding: 0 .5rem; min-width: 90px; }
+.cvb-info .ap { display: flex; gap: 4px; } .cvb-info .ap i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--gold); } .cvb-info .ap i.on { background: var(--gold); }
+.cvb { flex: 1 1 96px; display: flex; flex-direction: column; align-items: center; gap: .1rem; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: .45rem .4rem; font-size: .8rem; font-weight: 700; transition: border-color .15s, transform .1s; }
+.cvb span { font-size: 1.25rem; } .cvb small { font-weight: 500; color: var(--gold); font-size: .7rem; }
+.cvb:hover:not(:disabled) { border-color: var(--gold); transform: translateY(-2px); }
+.cvb-end { flex: 1 1 140px; font-size: .95rem; }
+
 /* game over & hall */
 .over, .hall { max-width: 640px; margin: 0 auto; text-align: center; }
 .over .avatar { display: block; margin: .5rem auto; }

@@ -12,7 +12,9 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const fmt = (n, d = 0) => Number(n).toFixed(d);
 const sign = (n, d = 1) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(d);
-const money = n => (n < 0 ? '−' : '') + '$' + Math.abs(n).toFixed(1) + 'B';
+const bigMoney = b => { const a = Math.abs(b); return (b < 0 ? '−' : '') + (a >= 1000 ? '$' + (a / 1000).toFixed(a >= 10000 ? 1 : 2) + 'T' : '$' + a.toFixed(a >= 100 ? 0 : 1) + 'B'); };
+const money = n => bigMoney(n * ((S && S.scale) || 1));   // game money is in "Veloria units"; shown at the real country's scale
+const gdpReal = () => S.gdp * (S.scale || 1);
 const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
 const zero = keys => Object.fromEntries(keys.map(k => [k, 0]));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,6 +29,34 @@ const approvalColor = v => { const t = clamp(v, 20, 80); return t < 50 ? lerpCol
 const stars = q => '★'.repeat(Math.max(1, Math.round(q / 20))) + '☆'.repeat(5 - Math.max(1, Math.round(q / 20)));
 
 const SAVE_KEY = 'president.save.v2', BEST_KEY = 'president.best.v1';
+
+// ---------- country & role ----------
+let COUNTRY = COUNTRIES[0];
+const ROLE = { title: 'President', upper: 'PRESIDENT', race: 'Presidential', ev: 'electoral votes', palace: 'Presidential Palace' };
+function applyCountry(id) {
+  COUNTRY = COUNTRIES.find(c => c.id === id) || COUNTRIES[0];
+  REGIONS.forEach((r, i) => {
+    const base = VELORIA_REGIONS[i], o = COUNTRY.regions ? COUNTRY.regions[r.id] : null;
+    Object.assign(r, base, { mix: { ...base.mix }, city: [...base.city] });
+    if (o) Object.assign(r, o, { mix: { ...o.mix }, city: [base.city[0], base.city[1], o.city] });
+  });
+  if (typeof NAT !== 'undefined') GK.forEach(g => NAT[g] = REGIONS.reduce((t, r) => t + r.mix[g] * r.pop, 0) / 100);
+  NEIGHBOR = COUNTRY.fictional ? 'Draskor Federation' : 'Hostile Coalition';
+  const pres = COUNTRY.system === 'presidential';
+  Object.assign(ROLE, { title: COUNTRY.title, upper: COUNTRY.title.toUpperCase(), race: pres ? 'Presidential' : 'General', ev: pres ? 'electoral votes' : 'seat share', palace: pres ? 'Presidential Palace' : 'Government House' });
+}
+const majority = () => Math.floor(((S && S.parl && S.parl.size) || 100) / 2) + 1;
+const twoThirds = () => Math.ceil(((S && S.parl && S.parl.size) || 100) * 2 / 3);
+const TT = () => (S && S.termTurns) || 8;          // half-years per term
+const MAXT = () => (S && S.maxTerms) || 2;         // terms allowed
+function startBuildingsFor(C) {
+  if (C.fictional) return JSON.parse(JSON.stringify(START_BUILDINGS));
+  const b = { capital: ['hospital', 'school', 'airport'], north: ['factory', 'coal'], coast: ['school'], farm: ['school'], high: ['base'] };
+  RK.forEach(r => { if (reg(r).coast && !b[r].includes('port')) b[r].push('port'); });
+  if (C.infra >= 55) { ['north', 'coast', 'farm', 'high'].forEach(r => { if (!b[r].includes('hospital')) b[r].push('hospital'); }); ['north', 'coast'].forEach(r => b[r].push('airport')); b.capital.push('highway'); }
+  if (C.infra >= 70) { ['farm', 'high'].forEach(r => b[r].push('airport')); b.north.push('highway'); b.farm.push('solar'); b.capital.push('park'); }
+  return b;
+}
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
@@ -41,7 +71,7 @@ let S = null;
 const UI = {
   screen: 'title', region: 'capital', tab: 'budget', speech: null, busy: false,
   walkFrom: null, revealed: 0, cloud: null,
-  setup: { name: '', country: 'Republic of Veloria', party: 'prog',
+  setup: { name: '', country: 'Republic of Veloria', party: 'prog', countryId: 'veloria',
     look: { skin: '#e0ac69', hair: '#1f1308', style: 'short', suit: '#1e293b', tie: '#b91c1c' } },
 };
 
@@ -69,7 +99,7 @@ const count = type => S.buildings ? RK.reduce((n, r) => n + S.buildings[r].filte
 const totalBuildings = () => S.buildings ? RK.reduce((n, r) => n + S.buildings[r].length, 0) : 0;
 function energy() { return { supply: 45 + count('coal') * 22 + count('solar') * 15, demand: S.gdp * .6 }; }
 function unemployment() { return clamp(13 - (S.stats.economy - 50) * .22 - count('factory') * .7 - (S.projects || []).length * .4, 2, 30); }
-function milStrength() { const m = S.mil; return m.army * .5 + m.air * .3 + m.navy * .2 + count('base') * 6 + (m.alliance ? 15 : 0) + S.stats.security * .1; }
+function milStrength() { const m = S.mil; return (COUNTRY.landlocked ? m.army * .6 + m.air * .4 : m.army * .5 + m.air * .3 + m.navy * .2) + count('base') * 6 + (m.alliance ? 15 : 0) + S.stats.security * .1; }
 function devIndex() { return avg(['economy', 'health', 'education', 'housing'].map(k => S.stats[k])) * .6 + Math.min(100, totalBuildings() * 3.5) * .4; }
 function devLevel(d = devIndex()) { return d < 40 ? 'Developing' : d < 55 ? 'Emerging' : d < 70 ? 'Developed' : 'Advanced'; }
 function warRisk() { const gap = S.threat - milStrength(); return gap > 15 ? ['High', 'bad'] : gap > 0 ? ['Medium', 'warn'] : ['Low', 'good']; }
@@ -215,16 +245,19 @@ function nationalPoll() {
 
 function newGame() {
   const su = UI.setup;
+  applyCountry(su.countryId);
   S = {
-    v: 2, phase: 'campaign', country: su.country.trim() || 'Republic of Veloria',
+    v: 2, phase: 'campaign', countryId: COUNTRY.id, flag: COUNTRY.flag,
+    country: COUNTRY.fictional ? (su.country.trim() || 'Republic of Veloria') : COUNTRY.name,
+    scale: COUNTRY.gdp / 100, pop: COUNTRY.pop, termTurns: COUNTRY.termYears * 2, maxTerms: COUNTRY.termLimit || 3,
     player: { name: su.name.trim() || 'Alex Morgan', party: su.party, look: { ...su.look } },
     opp: { name: pick(OPP_NAMES), party: pick(PARTIES.filter(p => p.id !== su.party)).id, look: randomLook() },
     term: 0, turn: 0, served: 0, promises: [], laws: [], news: [], hist: [], built: 0,
-    buildings: JSON.parse(JSON.stringify(START_BUILDINGS)),
+    buildings: startBuildingsFor(COUNTRY),
   };
-  news(`${S.player.name} announces run for president of ${S.country}`);
+  news(`${S.player.name} announces run for ${ROLE.title.toLowerCase()} of ${S.country}`);
   startCampaign(false);
-  say(`My fellow citizens of ${S.country} — I'm running for president!`);
+  say(`My fellow citizens of ${S.country} — I'm running for ${ROLE.title.toLowerCase()}!`);
   save(); render();
 }
 
@@ -274,6 +307,7 @@ async function campAction(id) {
   if (Math.abs(d) >= 0.05) toast(`National poll ${sign(d)}%`, d >= 0 ? 'good' : 'bad');
   save(); render();
   City.event(id, { g, text: g ? PROMISES[g].text.toLowerCase() : '' });
+  scrollToCity();
 }
 
 function applyCampFx(fx) {
@@ -306,10 +340,10 @@ async function debate() {
   const c = S.camp;
   if (!c.minor) startCampaignMinors(c);
   const cast = [{ ...c.minor[0], role: 'minor' }, { ...S.player, role: 'player' }, { ...S.opp, role: 'opp' }, { ...c.minor[1], role: 'minor' }];
-  Debate.open({ cast, country: S.country });
+  Debate.open({ cast, country: S.country, race: `${ROLE.race} election` });
   const { PLAYER, OPP, MOD } = Debate;
   Debate.panel('<div class="dwait">Click the stage to skip ▶</div>');
-  await Debate.say(MOD, `Good evening and welcome to the presidential debate of ${S.country}!`, 2800);
+  await Debate.say(MOD, `Good evening and welcome to the ${ROLE.race.toLowerCase()} election debate of ${S.country}!`, 2800);
   for (const i of [0, 1, 2, 3]) {
     const who = cast[i];
     await Debate.say(i, i === PLAYER ? `Good evening, ${S.country}! I'm ${who.name}.` : `Good evening. I'm ${who.name} of the ${partyById(who.party).name}.`, 1700);
@@ -392,18 +426,19 @@ function electionTotals(n = S.elec.order.length) {
 
 // ---------- parliament ----------
 function makeParliament(pv) {
+  const n = COUNTRY.seats || 100;
   const me = S.player.party, opp = S.opp.party, others = PARTIES.map(p => p.id).filter(id => id !== me && id !== opp);
   const sh = { [me]: pv * .82, [opp]: (100 - pv) * .82 };
   const rest = 100 - sh[me] - sh[opp], k = rnd(.35, .65);
   sh[others[0]] = rest * k; sh[others[1]] = rest * (1 - k);
   const seats = {}, rems = []; let tot = 0;
-  for (const id in sh) { seats[id] = Math.floor(sh[id]); tot += seats[id]; rems.push([id, sh[id] - seats[id]]); }
+  for (const id in sh) { const v = sh[id] * n / 100; seats[id] = Math.floor(v); tot += seats[id]; rems.push([id, v - seats[id]]); }
   rems.sort((a, b) => b[1] - a[1]);
-  for (let i = 0; tot < 100; i++, tot++) seats[rems[i % rems.length][0]]++;
+  for (let i = 0; tot < n; i++, tot++) seats[rems[i % rems.length][0]]++;
   const dist = id => GK.reduce((s, g) => s + Math.abs(partyById(me).bias[g] - partyById(id).bias[g]), 0) / 5;
   const rel = {}; PARTIES.forEach(p => rel[p.id] = p.id === me ? 100 : clamp(55 - dist(p.id) * 1.2 - (p.id === opp ? 12 : 0)));
   const old = S.parl ? S.parl.coalition.filter(id => id !== me && seats[id]) : [];
-  return { seats, coalition: [me, ...old], rel };
+  return { seats, coalition: [me, ...old], rel, size: n };
 }
 const coalitionSeats = () => S.parl.coalition.reduce((s, id) => s + (S.parl.seats[id] || 0), 0);
 function lean(L, pid) { const b = partyById(pid).bias; return clamp(GK.reduce((s, g) => s + (L.g[g] || 0) * b[g], 0) / 120, -1, 1); }
@@ -446,16 +481,19 @@ async function afterElection() {
   const newP = S.camp.newPromises;
   if (!re) {
     S.term = 1; S.turn = 1;
-    S.stats = { economy: 52, health: 48, education: 46, security: 50, environment: 52, freedom: 58, housing: 45 };
+    S.stats = COUNTRY.stats ? { ...COUNTRY.stats } : { economy: 52, health: 48, education: 46, security: 50, environment: 52, freedom: 58, housing: 45 };
     SK.forEach(k => S.stats[k] = clamp(S.stats[k] + rnd(-4, 4)));
     S.ga = {}; GK.forEach(g => S.ga[g] = clamp(S.camp.symP[g] + 4));
     S.eventMods = zero(GK); S.lawMods = zero(GK); S.lawStat = zero(SK); S.lawCost = 0;
-    S.budget = { tax: 27, health: 5, education: 5, security: 5, infra: 5, welfare: 5 };
-    S.gdp = 100; S.debt = 55; S.pc = 3; S.deck = shuffle(GOV_EVENTS.map(e => e.id));
+    S.gdp = 100; S.debt = COUNTRY.debt; S.rate = COUNTRY.rate || .015; S.pc = 3; S.deck = shuffle(GOV_EVENTS.map(e => e.id));
+    S.debtSoft = Math.max(80, COUNTRY.debt + 10); S.crisisAt = Math.max(120, COUNTRY.debt + 35);
+    S.mil = { ...(COUNTRY.mil || { army: 30, air: 20, navy: 20 }), alliance: false };
+    const milUp = (S.mil.army + S.mil.air + S.mil.navy) * .012;
+    S.budget = { tax: Math.round(clamp(2 * (12.5 + milUp + S.debt * S.rate) - 1, 10, 48)), health: 5, education: 5, security: 5, infra: 5, welfare: 5 };
     initGovExtras();
     S.hist = [approval()];
   } else {
-    S.term = 2; S.turn = 9; S.pc += 2;
+    S.term++; S.turn = (S.term - 1) * TT() + 1; S.pc += 2;
     GK.forEach(g => S.ga[g] = clamp(S.ga[g] + 3));
   }
   S.parl = makeParliament(S.lastElection.pvShare);
@@ -464,21 +502,22 @@ async function afterElection() {
   S.phase = 'govern'; S.lawThisTurn = false; S.diploThisTurn = false; S.pendingEvent = true;
   S.statsPrev = { ...S.stats }; S.gaPrev = { ...S.ga };
   UI.screen = 'govern'; UI.tab = 'build'; UI.walkFrom = null;
-  news(`${S.player.name} sworn in as president${re ? ' for a second term' : ''}`);
+  news(`${S.player.name} sworn in as ${ROLE.title.toLowerCase()}${re ? ` for term ${S.term}` : ''}`);
   news(`New parliament: your ${partyById(S.player.party).name} wins ${S.parl.seats[S.player.party]} of 100 seats`);
   say(re ? 'Four more years! Let\'s finish what we started.' : `Thank you, ${S.country}. Let's get to work!`);
   save(); render();
   const mine = S.parl.seats[S.player.party], cs = coalitionSeats();
-  await infoModal('🎉', re ? 'Re-elected!' : 'You are the President!',
-    (re ? `<p>The people have given you a second term. It's your last — make it count for your legacy.</p>`
-       : `<p>Welcome to the palace, President ${esc(S.player.name)}!</p>
+  await infoModal('🎉', re ? 'Re-elected!' : `You are the ${ROLE.title}!`,
+    (re ? `<p>The people have given you term ${S.term}.${S.term >= MAXT() ? ' It\'s your last — make it count for your legacy.' : ''}</p>`
+       : `<p>Welcome, ${ROLE.title} ${esc(S.player.name)}!</p>
+          ${COUNTRY.fictional ? '' : `<p class="muted small">${S.flag} ${esc(S.country)}: ${fmt(S.pop, 1)}M people · GDP ${bigMoney(COUNTRY.gdp)} · debt ${fmt(COUNTRY.debt)}% of GDP · ${COUNTRY.termYears}-year terms${COUNTRY.termLimit ? `, max ${COUNTRY.termLimit}` : ''} · ${COUNTRY.parl}: ${COUNTRY.seats} seats. ${COUNTRY.note}</p>`}
           <ul class="tips"><li>🏗️ <b>Build</b>: tap a region, open a tender and award the project to a company.</li>
           <li>🏘️ <b>Housing</b>: sell new homes to citizens — choose affordable, market or luxury prices.</li>
-          <li>🏛️ <b>Parliament</b>: you need 51 votes to pass laws. Form a coalition if you lack a majority.</li>
+          <li>🏛️ <b>Parliament</b>: you need ${majority()} of ${S.parl.size} votes to pass laws. Form a coalition if you lack a majority.</li>
           <li>🛡️ <b>Defense</b>: keep your military stronger than the ${NEIGHBOR}'s threat.</li>
           <li>💰 <b>Budget</b>: taxes and spending — watch the debt.</li>
           <li>🤝 Keep your campaign promises before the next election!</li></ul>`)
-    + `<p class="advisor">🏛️ Parliament: your party has <b>${mine}</b> seats${cs !== mine ? `, your coalition <b>${cs}</b>` : ''}. ${cs >= 51 ? 'You have a majority.' : 'No majority — consider inviting a partner into a coalition.'}</p>`, 'Start governing');
+    + `<p class="advisor">🏛️ Parliament: your party has <b>${mine}</b> seats${cs !== mine ? `, your coalition <b>${cs}</b>` : ''}. ${cs >= majority() ? 'You have a majority.' : 'No majority — consider inviting a partner into a coalition.'}</p>`, 'Start governing');
   await turnStart();
 }
 
@@ -502,7 +541,7 @@ function initGovExtras() {
 const MAX_PROJECTS = 4;
 function buildBlock(type, rid) {
   const P = PROJECTS[type];
-  if (P.only && !P.only.includes(rid)) return 'Not possible in this region';
+  if (type === 'port' && !reg(rid).coast) return COUNTRY.landlocked ? 'Landlocked country — no sea' : 'No coastline in this region';
   const n = S.buildings[rid].filter(b => b === type).length + S.projects.filter(p => p.type === type && p.region === rid).length;
   if (n >= P.max) return `Limit: ${P.max} per region`;
   if (S.projects.length >= MAX_PROJECTS) return `Max ${MAX_PROJECTS} projects at once`;
@@ -539,7 +578,7 @@ async function startTender(type) {
   news(`${b.c.name} wins ${money(b.price)} contract for ${P.name} in ${r.name}`);
   say(`Construction of the ${P.name.toLowerCase()} in ${r.short} begins!`);
   toast(`Contract awarded to ${b.c.name}`, 'good');
-  save(); render(); City.visit('site');
+  save(); render(); City.visit('site'); scrollToCity();
 }
 function progressProjects() {
   const msgs = [];
@@ -558,7 +597,7 @@ function progressProjects() {
       if (p.type === 'housing') S.housing.stock[p.region] += P.units;
       S.companies[c.id] = clamp(S.companies[c.id] + (p.delays ? 1 : 6));
       msgs.push(`✅ ${P.icon} ${P.name} opened in ${r.name}!`);
-      news(`President opens new ${P.name.toLowerCase()} in ${r.name}`);
+      news(`${ROLE.title} opens new ${P.name.toLowerCase()} in ${r.name}`);
       if (p.q < 55 && Math.random() < .35) {
         GK.forEach(g => S.ga[g] = clamp(S.ga[g] - 3)); S.regionMods[p.region] -= 5; S.companies[c.id] = clamp(S.companies[c.id] - 12);
         msgs.push(`⚠️ Defects found in the new ${P.name.toLowerCase()} built by ${c.name}!`);
@@ -592,7 +631,7 @@ function sellHomes() {
 // ---------- defense ----------
 function upgradeMil(b) {
   const U = MIL_UPGRADES[b];
-  if (UI.busy || S.pendingEvent || S.mil[b] >= 100) return;
+  if (UI.busy || S.pendingEvent || S.mil[b] >= 100 || (b === 'navy' && COUNTRY.landlocked)) return;
   S.mil[b] = Math.min(100, S.mil[b] + 8); S.debt += U.cost;
   S.eventMods.elderly += .5;
   say(`Our ${U.name.toLowerCase()} grows stronger.`); toast(`${U.name} +8 (−${money(U.cost)})`, 'good');
@@ -617,7 +656,7 @@ async function invasion() {
     { t: '🕊️ Sign a peace treaty', fx: {}, note: `Pay ${money(5)} and lose some pride (everyone ▼)` },
   ];
   if (S.mil.alliance) choices.push({ t: '🤝 Call on our allies', fx: {}, note: 'Allies send troops. High chance to win, costs ⭐2' });
-  const k = await choiceModal({ icon: '🚨', title: 'INVASION!', text: `Troops of the ${NEIGHBOR} have crossed the border into the Western Highlands!`, choices });
+  const k = await choiceModal({ icon: '🚨', title: 'INVASION!', text: `Troops of the ${NEIGHBOR} have crossed the border into ${reg('high').name}!`, choices });
   if (k === 1) {
     S.debt += 5; GK.forEach(g => S.ga[g] = clamp(S.ga[g] - 4)); S.threat = clamp(S.threat - 20, 5, 100);
     news(`Peace treaty signed with the ${NEIGHBOR}`);
@@ -645,7 +684,7 @@ function budgetCalc() {
   const spend = (b.health + b.education + b.security + b.infra + b.welfare) * S.gdp * 0.005;
   const laws = S.lawCost * S.gdp / 100;
   const mil = (S.mil.army + S.mil.air + S.mil.navy) * .012 + (S.mil.alliance ? .5 : 0);
-  const interest = Math.max(0, S.debt) * 0.015;
+  const interest = Math.max(0, S.debt) * (S.rate || 0.015);
   return { rev, spend, laws, mil, interest, bal: rev - spend - laws - mil - interest };
 }
 function groupTarget(g) {
@@ -653,13 +692,13 @@ function groupTarget(g) {
   let t = 50 + bias;
   switch (g) {
     case 'workers': t += .3 * d('economy') + .15 * d('health') + .1 * d('housing') + .05 * d('security') + (b.welfare - 5) * 2 - (b.tax - 25) * .25 - (unemployment() - 8) * 1.2; break;
-    case 'business': t += .6 * d('economy') + .1 * d('security') - (b.tax - 25) * 1.0 - Math.max(0, debtPct() - 90) * .2; break;
+    case 'business': t += .6 * d('economy') + .1 * d('security') - (b.tax - 25) * 1.0 - Math.max(0, debtPct() - (S.debtSoft || 80) - 10) * .2; break;
     case 'farmers': t += .3 * d('economy') + .2 * d('environment') + .1 * d('security') + (b.infra - 5) * 1.2; break;
     case 'youth': t += .15 * d('economy') + .25 * d('education') + .25 * d('environment') + .25 * d('freedom') + .25 * d('housing') - Math.max(0, b.security - 6) * 1.5; break;
     case 'elderly': t += .1 * d('economy') + .45 * d('health') + .3 * d('security') + (b.welfare - 5) * 1.5; break;
   }
   t -= Math.max(0, S.threat - milStrength()) * .15; // fear of war
-  return clamp(t + S.lawMods[g] + S.eventMods[g] - S.served * .6); // .6/turn = voter fatigue
+  return clamp(t + S.lawMods[g] + S.eventMods[g] - S.served * .6 * 8 / TT()); // voter fatigue
 }
 function simulateTurn() {
   const b = S.budget, st = S.stats, ls = S.lawStat;
@@ -675,9 +714,9 @@ function simulateTurn() {
     education: 25 + b.education * 6 + ls.education,
     security: 25 + b.security * 6 + ls.security,
     environment: 72 - b.infra * 2.2 - (st.economy - 50) * .2 + ls.environment,
-    economy: 44 + b.infra * 2.2 - (b.tax - 25) * .9 - Math.max(0, debtPct() - 80) * .35 + (b.welfare - 5) * .5 - shortage * .6 + ls.economy,
+    economy: 44 + b.infra * 2.2 - (b.tax - 25) * .9 - Math.max(0, debtPct() - (S.debtSoft || 80)) * .35 + (b.welfare - 5) * .5 - shortage * .6 + ls.economy,
     freedom: 68 - Math.max(0, b.security - 5) * 3 + ls.freedom,
-    housing: 40 - S.served * 1.0 + ls.housing,
+    housing: 40 - S.served * 8 / TT() + ls.housing,
   };
   SK.forEach(k => st[k] = clamp(st[k] + (clamp(T[k]) - st[k]) * .3 + rnd(-1.5, 1.5)));
   const growth = (st.economy - 45) / 25 + rnd(-.4, .4);
@@ -713,13 +752,13 @@ function applyGovFx(fx) {
 async function turnStart() {
   if (!S || S.phase !== 'govern' || !S.pendingEvent) return;
   let ev;
-  if (debtPct() > 120 && !(S.crisisTurn && S.turn - S.crisisTurn < 4)) { ev = DEBT_EVENT; S.crisisTurn = S.turn; }
+  if (debtPct() > (S.crisisAt || 120) && !(S.crisisTurn && S.turn - S.crisisTurn < 4)) { ev = DEBT_EVENT; S.crisisTurn = S.turn; }
   else {
     if (!S.deck || !S.deck.length) S.deck = shuffle(GOV_EVENTS.map(e => e.id));
     const id = S.deck.pop();
     ev = GOV_EVENTS.find(e => e.id === id) || pick(GOV_EVENTS);
   }
-  const k = await choiceModal({ ...ev, mode: 'gov' });
+  const k = await choiceModal({ ...ev, text: ev.text.replace(/\{NEIGHBOR\}/g, NEIGHBOR), mode: 'gov' });
   applyGovFx(ev.choices[k].fx); news(ev.choices[k].news || ev.title);
   S.pendingEvent = false; save(); render();
 }
@@ -728,14 +767,14 @@ function advisorTip() {
   const lowS = [...SK].sort((a, b) => S.stats[a] - S.stats[b])[0];
   const pending = S.promises.filter(p => p.term === S.term && !S.laws.includes(PROMISES[p.g].law));
   const en = energy();
-  if (pending.length && S.turn % 8 >= 5) return `🧑‍💼 Advisor: the election is coming — you still haven't delivered “${PROMISES[pending[0].g].text}”.`;
+  if (pending.length && (S.turn % TT()) >= TT() * .6) return `🧑‍💼 Advisor: the election is coming — you still haven't delivered “${PROMISES[pending[0].g].text}”.`;
   if (S.threat - milStrength() > 10) return `🧑‍💼 Advisor: the ${NEIGHBOR} is getting dangerous. Strengthen the military or hold a peace summit.`;
   if (en.demand > en.supply) return '🧑‍💼 Advisor: we are running out of electricity. Build a power plant or solar farm.';
-  if (debtPct() > 95) return '🧑‍💼 Advisor: debt is dangerously high. Raise taxes, cut spending or sell homes at market price.';
+  if (debtPct() > (S.debtSoft || 80) + 15) return '🧑‍💼 Advisor: debt is dangerously high. Raise taxes, cut spending or sell homes at market price.';
   if (S.ga[lowG] < 40) return `🧑‍💼 Advisor: ${GROUPS[lowG].name} are unhappy (${fmt(S.ga[lowG])}%). A speech or a law for them could help.`;
   if (S.stats[lowS] < 40) return `🧑‍💼 Advisor: ${STATS[lowS].name} is weak (${fmt(S.stats[lowS])}). ${lowS === 'housing' ? 'Build housing estates and sell homes.' : 'Consider more funding or a new project.'}`;
   if (!S.projects.length) return '🧑‍💼 Advisor: no construction going on. A new project would create jobs.';
-  return '🧑‍💼 Advisor: steady progress, President. Keep it up.';
+  return `🧑‍💼 Advisor: steady progress, ${ROLE.title}. Keep it up.`;
 }
 async function endTurn() {
   if (UI.busy || S.pendingEvent) return; UI.busy = true;
@@ -757,28 +796,28 @@ async function endTurn() {
       <p class="advisor">${advisorTip()}</p>`);
     if (S.scandalRisk > 0 && Math.random() < .12 * S.scandalRisk) {
       S.scandalRisk = 0; GK.forEach(g => { S.ga[g] = clamp(S.ga[g] - 6); S.eventMods[g] -= 3; }); S.pc = Math.max(0, S.pc - 2);
-      news('BRIBERY SCANDAL: secret gifts to the president exposed');
+      news(`BRIBERY SCANDAL: secret gifts to the ${ROLE.title.toLowerCase()} exposed`);
       await infoModal('🕵️', 'Bribery scandal!', '<p>Journalists have uncovered the secret “gifts” you accepted from contractors. Approval drops across the country.</p>');
     }
     const str = milStrength();
     if (S.threat > str + 8 && Math.random() < (S.threat - str) / 50) await invasion();
     const ap = approval();
     if (ap < 25) { const removed = await impeachment(ap); if (removed) return gameOver('impeached'); }
-    if (S.turn === 8) {
+    if (S.turn >= TT() * MAXT()) return gameOver('retired');
+    if (S.turn % TT() === 0) {
       S.opp = { name: pick(OPP_NAMES.filter(n => n !== S.opp.name)), party: pick(PARTIES.filter(p => p.id !== S.player.party)).id, look: randomLook() };
-      await infoModal('🗳️', 'Election season!', `<p>Your first term is ending. <b>${esc(S.opp.name)}</b> of the ${partyById(S.opp.party).name} wants your job. Parliament is up for election too.</p><p>Your approval of <b>${fmt(ap)}%</b> sets your starting position. Projects you built help you in those regions. Broken promises will cost you.</p>`, 'Start re-election campaign');
+      await infoModal('🗳️', 'Election season!', `<p>Your term is ending. <b>${esc(S.opp.name)}</b> of the ${partyById(S.opp.party).name} wants your job. Parliament is up for election too.</p><p>Your approval of <b>${fmt(ap)}%</b> sets your starting position. Projects you built help you in those regions. Broken promises will cost you.</p>`, 'Start re-election campaign');
       startCampaign(true); say('Four more years? Let\'s earn it.'); save(); render(); return;
     }
-    if (S.turn >= 16) return gameOver('retired');
     S.turn++; S.lawThisTurn = false; S.pendingEvent = true; save(); render();
-    await turnStart();
+    await turnStart(); scrollToCity();
   } finally { UI.busy = false; }
 }
 async function impeachment(ap) {
-  await infoModal('⚖️', 'Impeachment motion!', `<p>With approval at just <b>${fmt(ap)}%</b>, the opposition calls a vote to remove you. They need <b>67 of 100</b> votes in parliament.</p>`, 'Watch the vote');
+  await infoModal('⚖️', 'Impeachment motion!', `<p>With approval at just <b>${fmt(ap)}%</b>, the opposition calls a vote to remove you. They need <b>${twoThirds()} of ${S.parl.size || 100}</b> votes in parliament.</p>`, 'Watch the vote');
   const me = S.player.party, x = (25 - ap) * .03;
   const seats = castVotes(pid => pid === me ? .03 + x / 3 : S.parl.coalition.includes(pid) ? .1 + x : .62 + x);
-  const passed = await voteModal('Impeachment vote', seats, 67, 'REMOVED FROM OFFICE', 'You survive — barely');
+  const passed = await voteModal('Impeachment vote', seats, twoThirds(), 'REMOVED FROM OFFICE', 'You survive — barely');
   if (!passed) { news(`${S.player.name} survives impeachment vote`); GK.forEach(g => S.ga[g] = clamp(S.ga[g] + 2)); }
   return passed;
 }
@@ -789,7 +828,7 @@ async function proposeLaw(id) {
   try {
     S.pc -= L.pc; S.lawThisTurn = true;
     const seats = castVotes(pid => voteProb(L, pid));
-    const ok = await voteModal(`Parliament votes: ${L.name}`, seats, 51, 'LAW PASSED ✓', 'Bill rejected ✗');
+    const ok = await voteModal(`${COUNTRY.parl || 'Parliament'} votes: ${L.name}`, seats, majority(), 'LAW PASSED ✓', 'Bill rejected ✗');
     PARTIES.forEach(p => { if (p.id !== S.player.party) S.parl.rel[p.id] = clamp(S.parl.rel[p.id] + lean(L, p.id) * 8); });
     if (ok) {
       S.laws.push(id);
@@ -825,7 +864,7 @@ function legacy(reason) {
   let score;
   if (reason === 'lost-first') score = Math.round((S.lastElection ? S.lastElection.pvShare : 0) * 10);
   else {
-    score = Math.round(avgAp * 8 + statsAvg * 4 + dev * 5 + (S.gdp - 100) * 6 + S.built * 15 + kept * 60 - broken * 40 + S.served * 30 - Math.max(0, debtPct() - 60) * 6);
+    score = Math.round(avgAp * 8 + statsAvg * 4 + dev * 5 + (S.gdp - 100) * 6 + S.built * 15 + kept * 60 - broken * 40 + S.served * 30 * 8 / TT() - Math.max(0, debtPct() - Math.max(60, (S.debtSoft || 80) - 20)) * 6);
     if (reason === 'retired') score += 400;
     if (reason === 'impeached') score -= 200;
   }
@@ -833,7 +872,7 @@ function legacy(reason) {
   if (reason === 'lost-first') title = 'The President Who Never Was';
   else if (reason === 'impeached') title = 'Impeached & Disgraced';
   else if (reason === 'lost-re') title = score >= 1200 ? 'One-Term Wonder' : 'Voted Out';
-  else title = score >= 2400 ? 'Legendary Statesman' : score >= 1900 ? 'Respected Leader' : score >= 1400 ? 'Steady Hand' : 'Forgettable Two-Termer';
+  else title = score >= 2400 ? 'Legendary Statesman' : score >= 1900 ? 'Respected Leader' : score >= 1400 ? 'Steady Hand' : 'Forgettable Leader';
   return { reason, score, title, kept, broken, avgAp, statsAvg, dev, served: S.served, terms: S.term || 0 };
 }
 function gameOver(reason) {
@@ -883,7 +922,7 @@ function renderTop() {
     t.innerHTML = chip('🗓️', `Week ${c.week}/${c.weeks}`) + chip('💵', `$${Math.round(c.funds)}M`) + chip('⚡', `${c.ap} actions`);
   } else if (S.ga && S.phase === 'govern') {
     const a = approval();
-    t.innerHTML = chip('🗓️', turnLabel()) + chip('👍', fmt(a) + '%', a < 35 ? 'bad' : a > 55 ? 'good' : '') + chip('🏦', `$${fmt(S.gdp)}B`) + chip('📉', `Debt ${fmt(debtPct())}%`, debtPct() > 100 ? 'bad' : '') + chip('⭐', `${S.pc} PC`);
+    t.innerHTML = chip('🗓️', turnLabel()) + chip('👍', fmt(a) + '%', a < 35 ? 'bad' : a > 55 ? 'good' : '') + chip('🏦', bigMoney(gdpReal())) + chip('📉', `Debt ${fmt(debtPct())}%`, debtPct() > 100 ? 'bad' : '') + chip('⭐', `${S.pc} PC`);
   } else t.innerHTML = '';
 }
 function renderTicker() {
@@ -996,7 +1035,14 @@ function renderSetup() {
         <button class="btn ghost small" data-act="randomLook">🎲 Random look</button></div>
       <div class="setup-form">
         <label>Your name<input data-input="name" maxlength="24" placeholder="e.g. Alex Morgan" value="${esc(su.name)}"></label>
-        <label>Country<input data-input="country" maxlength="40" value="${esc(su.country)}"></label>
+        <div class="lbl">Country</div>
+        <div class="country-grid">${COUNTRIES.map(c => `<button class="country ${su.countryId === c.id ? 'on' : ''}" data-act="setCountry" data-id="${c.id}"><span class="cflag">${c.flag}</span><b>${c.fictional ? 'Fictional country' : c.name}</b><small>${c.fictional ? 'Name it yourself' : `${c.pop >= 100 ? fmt(c.pop) : fmt(c.pop, 1)}M · ${bigMoney(c.gdp)}`}</small></button>`).join('')}</div>
+        ${(() => { const c = COUNTRIES.find(x => x.id === su.countryId) || COUNTRIES[0]; return c.fictional ? `<label>Country name<input data-input="country" maxlength="40" value="${esc(su.country)}"></label>` :
+          `<div class="cfacts"><b>${c.flag} ${c.name}</b> — ${c.system === 'presidential' ? 'presidential republic' : 'parliamentary system'}. You run for <b>${c.title}</b>.
+          <ul><li>👥 Population ${c.pop >= 100 ? fmt(c.pop) : fmt(c.pop, 1)} million · 💵 GDP ${bigMoney(c.gdp)} (IMF 2025) · 📉 Debt ${fmt(c.debt, 1)}% of GDP</li>
+          <li>🗓️ ${c.termYears}-year terms${c.termLimit ? ` · limit: ${c.termLimit} term${c.termLimit > 1 ? 's' : ''}` : ' · no term limit'} · 🏛️ ${c.parl}: ${c.seats} seats</li>
+          <li>🗺️ ${Object.values(c.regions).map(r => r.city).join(', ')}${c.landlocked ? ' · 🚫 landlocked' : ''}</li></ul>
+          <span class="muted small">${c.note} Parties and candidates are fictional.</span></div>`; })()}
         <div class="lbl">Party</div>
         <div class="party-grid">${PARTIES.map(p => `<button class="party ${su.party === p.id ? 'on' : ''}" data-act="setParty" data-id="${p.id}" style="--pc:${p.color}">
           <b>${p.name}</b><small>“${p.slogan}”</small>
@@ -1024,25 +1070,22 @@ function renderCampaign() {
   return `<div class="card camp-head">
     <div class="vs">
       <div class="cand">${avatarSVG(S.player.look, mood(), 58)}<div><b>${esc(S.player.name)}</b><small style="color:${pp.color}">${pp.name}</small></div></div>
-      <div class="vs-mid"><div class="kicker">${c.re ? 'Re-election campaign' : 'Presidential campaign'}</div><div class="weeks">Week ${c.week} of ${c.weeks}${c.week === c.debateWeek ? ' · 🎙️ TV debate this week' : ''}</div></div>
+      <div class="vs-mid"><div class="kicker">${c.re ? 'Re-election campaign' : `${ROLE.race} election campaign`}</div><div class="weeks">Week ${c.week} of ${c.weeks}${c.week === c.debateWeek ? ' · 🎙️ TV debate this week' : ''}</div></div>
       <div class="cand right"><div><b>${esc(S.opp.name)}</b><small style="color:${op.color}">${op.name}</small></div>${avatarSVG(S.opp.look, 0, 58)}</div>
     </div>
     ${c.minor ? `<div class="also"><span class="muted small">Also running:</span>${c.minor.map(m => `<span class="mini">${avatarSVG(m.look, 0, 26)}<span>${esc(m.name)}<small style="color:${partyById(m.party).color}">${partyById(m.party).name}</small></span></span>`).join('')}</div>` : ''}
     ${pollBar(np.p, np.u, np.o)}
-    <div class="ev">Projected electoral votes: <b style="color:${pp.color}">${np.evP}</b> – <b style="color:${op.color}">${np.evO}</b> <span class="muted">· 51 to win</span></div>
+    <div class="ev">Projected ${ROLE.ev}: <b style="color:${pp.color}">${np.evP}</b> – <b style="color:${op.color}">${np.evO}</b> <span class="muted">· 51 to win</span></div>
   </div>
   ${cityCard()}
   <div class="grid3">
     <div class="card mapcard">${bubble()}${mapSVG('camp')}<p class="muted small center">Tap a region to travel there.</p></div>
     <div class="card">
-      <h3>📍 ${r.name} <small class="muted">${r.pop} electoral votes · ${r.city[2]}</small></h3>
+      <h3>📍 ${r.name} <small class="muted">${r.pop}% of ${ROLE.ev} · ${r.city[2]}</small></h3>
       ${pollBar(pr.p, pr.u, pr.o, 'sm')}
       <p class="muted small">${r.desc}</p>
       <div class="mix">${GK.filter(g => r.mix[g] > 0).map(g => `<span>${GROUPS[g].icon} ${Math.round(r.mix[g] * 100)}%</span>`).join('')}</div>
-      <div class="acthead"><b>Actions</b><span class="ap">${'<i class="on"></i>'.repeat(c.ap)}${'<i></i>'.repeat(3 - c.ap)}</span><span class="funds">💵 $${Math.round(c.funds)}M</span></div>
-      <div class="actions">${Object.entries(CAMP_ACTIONS).map(([id, a]) => `<button class="act" data-act="camp" data-id="${id}" ${c.ap <= 0 || c.funds < a.cost || (id === 'promise' && !promisesLeft()) ? 'disabled' : ''}>
-        <span class="ai">${a.icon}</span><span class="at"><b>${a.name}${a.region ? ` · ${r.short}` : ''}</b><small>${a.desc}</small></span><em>${a.cost ? '$' + a.cost + 'M' : 'free'}</em></button>`).join('')}</div>
-      <button class="btn primary big wide" data-act="endWeek">${c.week === c.weeks ? 'Go to Election Day 🗳️' : 'End week →'}</button>
+      <p class="muted small">👆 Use the action bar under the city view — every action plays out right there.</p>
     </div>
     <div class="card">
       <h3>Voter groups <small class="muted">you : rival</small></h3>
@@ -1077,12 +1120,12 @@ function statBar(k) {
   return `<div class="stat"><span>${STATS[k].icon} ${STATS[k].name}</span><div class="bar"><div style="width:${v}%;background:${approvalColor(v)}"></div></div><b>${fmt(v)}</b><em class="${d >= 0 ? 'up' : 'down'}">${Math.abs(d) >= .5 ? (d > 0 ? '▲' : '▼') : ''}</em></div>`;
 }
 function chartSVG() {
-  const h = S.hist, W = 300, H = 80, n = Math.max(16, h.length - 1);
+  const h = S.hist, W = 300, H = 80, n = Math.max(TT() * MAXT(), h.length - 1);
   const pts = h.map((v, i) => `${(i / n * W).toFixed(1)},${(H - v / 100 * H).toFixed(1)}`).join(' ');
   const last = h.length ? [(h.length - 1) / n * W, H - h[h.length - 1] / 100 * H] : [0, H / 2];
   return `<svg class="chart" viewBox="-4 -4 ${W + 8} ${H + 8}" preserveAspectRatio="none">
     <line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="mid"/><line x1="0" x2="${W}" y1="${H * .75}" y2="${H * .75}" class="danger"/>
-    <line x1="${8 / 16 * W}" x2="${8 / 16 * W}" y1="0" y2="${H}" class="term"/>
+    ${Array.from({ length: MAXT() - 1 }, (_, i) => `<line x1="${(i + 1) * TT() / n * W}" x2="${(i + 1) * TT() / n * W}" y1="0" y2="${H}" class="term"/>`).join('')}
     <polyline points="${pts}" class="line"/><circle cx="${last[0]}" cy="${last[1]}" r="3.5" class="dot"/></svg>
     <div class="chart-legend muted small"><span>— 50%</span><span class="bad">— 25% impeachment risk</span><span>| re-election</span></div>`;
 }
@@ -1097,7 +1140,7 @@ function overviewHTML() {
   const box = (icon, label, val, cls = '') => `<div class="ov"><span>${icon} ${label}</span><b class="${cls}">${val}</b></div>`;
   return `<div class="overview">
     ${box('👥', 'Population', `${fmt(S.pop, 1)}M`)}
-    ${box('💵', 'GDP per person', `$${fmt(S.gdp * 1000 / S.pop / 1000, 1)}k`)}
+    ${box('💵', 'GDP per person', `$${fmt(gdpReal() / S.pop, 1)}k`)}
     ${box('🧰', 'Unemployment', `${fmt(u, 1)}%`, u > 10 ? 'bad' : u < 6 ? 'good' : '')}
     ${box('⚡', 'Energy', `${fmt(en.supply)} / ${fmt(en.demand)}`, en.supply < en.demand ? 'bad' : 'good')}
     ${box('🏗️', 'Buildings', `${totalBuildings()}${S.projects.length ? ` +${S.projects.length}🚧` : ''}`)}
@@ -1156,29 +1199,33 @@ function housingHTML() {
 }
 function lawsHTML() {
   const promisedLaws = S.promises.map(p => PROMISES[p.g].law);
-  return `<p class="muted small">One bill per half-year. ⭐ ${S.pc} political capital. 51 votes needed — see the 🏛️ Parliament tab.</p>
+  return `<p class="muted small">One bill per half-year. ⭐ ${S.pc} political capital. ${majority()} of ${S.parl.size || 100} votes needed — see the 🏛️ Parliament tab.</p>
   <div class="laws">${LAWS.map(L => {
     const passed = S.laws.includes(L.id), can = !passed && !S.lawThisTurn && S.pc >= L.pc && !S.pendingEvent;
     const ey = passed ? 0 : expectedYes(L);
     const fx = { g: L.g, s: L.s, cost: L.cost };
     return `<div class="law ${passed ? 'passed' : ''}"><div class="lh"><span class="li">${L.icon}</span><div><b>${L.name}</b>${promisedLaws.includes(L.id) && !passed ? '<span class="tag-p">🤝 promised</span>' : ''}<small>${L.desc}</small></div></div>
       <div class="fx">${fxChips(fx, 'gov')}</div>
-      <div class="lf">${passed ? '<span class="good">✓ In force</span>' : `<span class="small ${ey >= 55 ? 'good' : ey >= 48 ? 'warn' : 'bad'}">⭐${L.pc} · expected ~${ey} votes</span><button class="btn small ${can ? 'primary' : ''}" data-act="law" data-id="${L.id}" ${can ? '' : 'disabled'}>Propose</button>`}</div></div>`;
+      <div class="lf">${passed ? '<span class="good">✓ In force</span>' : `<span class="small ${ey >= majority() * 1.08 ? 'good' : ey >= majority() * .94 ? 'warn' : 'bad'}">⭐${L.pc} · expected ~${ey} votes</span><button class="btn small ${can ? 'primary' : ''}" data-act="law" data-id="${L.id}" ${can ? '' : 'disabled'}>Propose</button>`}</div></div>`;
   }).join('')}</div>`;
 }
 function hemicycle() {
-  const rows = [14, 17, 20, 23, 26], pos = [];
-  rows.forEach((n, i) => { const R = 54 + i * 12; for (let j = 0; j < n; j++) { const a = Math.PI - j / (n - 1) * Math.PI; pos.push({ x: 120 + R * Math.cos(a), y: 112 - R * Math.sin(a), a }); } });
+  const n = S.parl.size || 100, rowsN = n <= 120 ? 5 : n <= 300 ? 8 : 11, r0 = 48, r1 = 112, pos = [];
+  const radii = Array.from({ length: rowsN }, (_, i) => r0 + (r1 - r0) * i / (rowsN - 1)), sumR = radii.reduce((a, b) => a + b, 0);
+  let left = n;
+  radii.forEach((R, i) => { const k = i === rowsN - 1 ? left : Math.round(n * R / sumR); left -= k; for (let j = 0; j < k; j++) { const a = Math.PI - (k === 1 ? .5 : j / (k - 1)) * Math.PI; pos.push({ x: 120 + R * Math.cos(a), y: 118 - R * Math.sin(a), a }); } });
   pos.sort((p, q) => q.a - p.a);
+  const dot = Math.max(1.3, Math.min(4.2, 300 / n * .9));
   const order = [...PARTIES].sort((a, b) => (S.parl.coalition.includes(b.id) ? 1 : 0) - (S.parl.coalition.includes(a.id) ? 1 : 0));
   const seq = []; order.forEach(p => { for (let i = 0; i < (S.parl.seats[p.id] || 0); i++) seq.push(p); });
-  return `<svg viewBox="0 0 240 128" class="hemi">${pos.map((p, i) => seq[i] ? `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.2" fill="${seq[i].color}" ${S.parl.coalition.includes(seq[i].id) ? 'stroke="#fff" stroke-width="1"' : 'opacity=".75"'}/>` : '').join('')}
-    <text x="120" y="108" class="hnum">${coalitionSeats()}</text><text x="120" y="124" class="hlbl">coalition seats · 51 = majority</text></svg>`;
+  return `<svg viewBox="0 0 240 134" class="hemi">${pos.map((p, i) => seq[i] ? `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dot}" fill="${seq[i].color}" ${S.parl.coalition.includes(seq[i].id) ? '' : 'opacity=".6"'}/>` : '').join('')}
+    <text x="120" y="112" class="hnum">${coalitionSeats()}</text><text x="120" y="128" class="hlbl">coalition seats · ${majority()} = majority</text></svg>`;
 }
 function parlHTML() {
   const me = S.player.party, cs = coalitionSeats();
   return `${hemicycle()}
-  <div class="verdict ${cs >= 51 ? 'good' : 'bad'} small-v">${cs >= 51 ? `✓ Your coalition has a majority (${cs}/100)` : `✗ No majority (${cs}/100) — laws need opposition votes`}</div>
+  <div class="muted small center">${esc(COUNTRY.parl || 'Parliament')} · ${S.parl.size || 100} seats</div>
+  <div class="verdict ${cs >= majority() ? 'good' : 'bad'} small-v">${cs >= majority() ? `✓ Your coalition has a majority (${cs}/${S.parl.size || 100})` : `✗ No majority (${cs}/${S.parl.size || 100}) — laws need opposition votes`}</div>
   ${PARTIES.filter(p => S.parl.seats[p.id]).map(p => {
     const inC = S.parl.coalition.includes(p.id), rel = S.parl.rel[p.id];
     return `<div class="prow" style="--pc:${p.color}"><div class="pn"><b>${p.name}</b><small>${S.parl.seats[p.id]} seats · ${p.id === me ? 'Your party' : inC ? 'Coalition partner' : p.id === S.opp.party ? 'Main opposition' : 'Opposition'}</small></div>
@@ -1192,7 +1239,7 @@ function defenseHTML() {
   return `<div class="dgauge"><div><span>🛡️ Your strength</span><b>${fmt(str)}</b></div><div class="vsx">vs</div><div><span>⚔️ ${NEIGHBOR} threat</span><b class="bad">${fmt(S.threat)}</b></div></div>
   <div class="verdict ${risk[1] === 'good' ? 'good' : 'bad'} small-v">Invasion risk: ${risk[0]}</div>
   ${Object.entries(MIL_UPGRADES).map(([k, U]) => `<div class="mrow"><span class="pi">${U.icon}</span><div class="pt"><b>${U.name} <small class="muted">${fmt(m[k])}/100</small></b><div class="bar"><div style="width:${m[k]}%;background:var(--gold)"></div></div><small class="muted">${U.desc}</small></div>
-    <button class="btn small" data-act="mil" data-id="${k}" ${S.pendingEvent || m[k] >= 100 ? 'disabled' : ''}>+8 · ${money(U.cost)}</button></div>`).join('')}
+    ${k === 'navy' && COUNTRY.landlocked ? '<span class="muted small">Landlocked</span>' : `<button class="btn small" data-act="mil" data-id="${k}" ${S.pendingEvent || m[k] >= 100 ? 'disabled' : ''}>+8 · ${money(U.cost)}</button>`}</div>`).join('')}
   <div class="mrow"><span class="pi">🪖</span><div class="pt"><b>Military bases: ${count('base')}</b><small class="muted">Each base adds +6 strength. Build more in the 🏗️ Build tab.</small></div></div>
   <div class="mrow"><span class="pi">🕊️</span><div class="pt"><b>Peace summit</b><small class="muted">Talks with the ${NEIGHBOR}: threat −12. Once per half-year.</small></div>
     <button class="btn small" data-act="diplo" ${S.pc >= 2 && !S.diploThisTurn && !S.pendingEvent ? '' : 'disabled'}>⭐2</button></div>
@@ -1214,35 +1261,73 @@ function cityMood(g, rid) {
   if (S.phase === 'campaign' && S.camp) { const c = S.camp; return clamp(50 + (c.symP[g] - c.symO[g]) * 2.2 + ((c.rbP[rid] || 0) - (c.rbO[rid] || 0)) * 1.5); }
   return clamp(S.ga[g] + S.regionMods[rid] * .5);
 }
+function cityBar(camp) {
+  if (camp) {
+    const c = S.camp, r = reg(UI.region);
+    return `<div class="cv-bar">
+      <div class="cvb-info"><span class="ap">${'<i class="on"></i>'.repeat(c.ap)}${'<i></i>'.repeat(3 - c.ap)}</span><b>💵 $${Math.round(c.funds)}M</b><small class="muted">in ${r.short}</small></div>
+      ${Object.entries(CAMP_ACTIONS).map(([id, a]) => `<button class="cvb" data-act="camp" data-id="${id}" title="${a.desc}" ${c.ap <= 0 || c.funds < a.cost || (id === 'promise' && !promisesLeft()) ? 'disabled' : ''}><span>${a.icon}</span>${(n => n[0].toUpperCase() + n.slice(1))(a.name.replace('Make a ', '').replace('Hold a ', ''))}<small>${a.cost ? '$' + a.cost + 'M' : 'free'}</small></button>`).join('')}
+      <button class="btn primary cvb-end" data-act="endWeek">${c.week === c.weeks ? 'Election Day 🗳️' : 'End week →'}</button></div>`;
+  }
+  return `<div class="cv-bar">
+    <div class="cvb-info"><b>⭐ ${S.pc} PC</b><small class="muted">${turnLabel()}</small></div>
+    <button class="cvb" data-act="buildPick" ${S.pendingEvent ? 'disabled' : ''}><span>🏗️</span>Build in ${reg(UI.region).short}<small>open tender</small></button>
+    <button class="cvb" data-act="speechPick" ${S.pc < 1 || S.pendingEvent ? 'disabled' : ''}><span>🎤</span>Give a speech<small>⭐1</small></button>
+    <button class="cvb" data-act="tab" data-id="housing" data-scroll="1"><span>🏘️</span>Housing<small>${S.housing.price}</small></button>
+    <button class="cvb" data-act="tab" data-id="parl" data-scroll="1"><span>🏛️</span>Parliament<small>${coalitionSeats()}/${S.parl.size || 100}</small></button>
+    <button class="cvb" data-act="tab" data-id="defense" data-scroll="1"><span>🛡️</span>Defense<small>risk ${warRisk()[0].toLowerCase()}</small></button>
+    <button class="btn primary cvb-end" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish →' : 'End term →') : 'End half-year →'}</button></div>`;
+}
+function scrollToCity() {
+  const el = $('.citycard'); if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (r.top < 40 || r.top > window.innerHeight * .35) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function buildPick() {
+  if (UI.busy || S.pendingEvent) return;
+  const r = reg(UI.region), keys = Object.keys(PROJECTS);
+  const choices = keys.map(k => { const P = PROJECTS[k], why = buildBlock(k, r.id); return { t: `${P.icon} ${P.name} — ${money(P.cost)}`, note: why ? `<span class="bad">${why}</span>` : `${P.desc} · ${P.turns} half-year${P.turns > 1 ? 's' : ''}`, disabled: !!why }; });
+  choices.push({ t: 'Cancel', note: '' });
+  const k = await choiceModal({ icon: '🏗️', title: `Build in ${r.name}`, text: 'Pick a project. Companies will then bid for the contract.', choices });
+  if (k < keys.length) startTender(keys[k]);
+}
+async function speechPick() {
+  if (S.pc < 1 || S.pendingEvent) return;
+  const choices = GK.map(g => ({ t: `${GROUPS[g].icon} ${GROUPS[g].name}`, note: `Approval ${fmt(S.ga[g])}% · +3` }));
+  choices.push({ t: 'Cancel', note: '' });
+  const k = await choiceModal({ icon: '🎤', title: 'Give a speech to…', text: 'Costs ⭐1 political capital.', choices });
+  if (k < GK.length) { speech(GK[k]); scrollToCity(); }
+}
 function cityCard() {
   const r = reg(UI.region), camp = S.phase === 'campaign';
   const ra = camp ? poll(r).share * 100 : regionApproval(r);
-  const people = camp || !S.pop ? r.pop * .24 : r.pop * S.pop / 100;
+  const people = r.pop * (S.pop || 24) / 100;
   const moodChip = g => { const v = cityMood(g, r.id); return `<span class="chip" title="${GROUPS[g].name}">${GROUPS[g].icon} ${v >= 60 ? '😊' : v < 40 ? '😠' : '😐'} ${fmt(v)}%</span>`; };
   return `<div class="card citycard">
     <div class="cv-head"><div class="cv-title"><b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${fmt(people, 1)}M people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span></div>
       <div class="moods">${GK.filter(g => r.mix[g] > 0).map(moodChip).join('')}</div>${regionPicker()}</div>
-    <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">${camp ? 'your campaign actions happen here · ' : ''}drag to explore · hover people &amp; buildings</div></div>
+    <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">drag to explore · hover people &amp; buildings</div></div>
+    ${cityBar(camp)}
   </div>`;
 }
 const TABS = [['budget', '💰 Budget'], ['build', '🏗️ Build'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];
 function renderGovern() {
-  const ap = approval(), pp = partyById(S.player.party), inTerm = (S.turn - 1) % 8 + 1;
+  const ap = approval(), pp = partyById(S.player.party), inTerm = (S.turn - 1) % TT() + 1;
   const tabHTML = { budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
   return `${cityCard()}<div class="grid3 gov">
     <div class="card leader">
       <div class="portrait">${bubble()}${avatarSVG(S.player.look, mood(), 110, 'float')}</div>
-      <h2>${esc(S.player.name)}</h2><div class="muted">President of ${esc(S.country)}</div>
+      <h2>${esc(S.player.name)}</h2><div class="muted">${ROLE.title} of ${S.flag || ''} ${esc(S.country)}</div>
       <div class="party-chip" style="--pc:${pp.color}">${pp.name}</div>
       <div class="ring" style="--v:${ap};--c:${approvalColor(ap)}"><div><b>${fmt(ap)}%</b><small>approval</small></div></div>
-      <div class="kv"><span>Term</span><b>${S.term} of 2 · half-year ${inTerm}/8</b></div>
+      <div class="kv"><span>Term</span><b>${S.term} of ${MAXT()} · half-year ${inTerm}/${TT()}</b></div>
       <div class="kv"><span>Political capital</span><b>⭐ ${S.pc}</b></div>
-      <div class="kv"><span>GDP</span><b>$${fmt(S.gdp, 1)}B ${S.lastGrowth !== undefined ? `<em class="${S.lastGrowth >= 0 ? 'up' : 'down'}">${sign(S.lastGrowth)}%</em>` : ''}</b></div>
-      <div class="kv"><span>Debt</span><b class="${debtPct() > 100 ? 'bad' : ''}">${fmt(debtPct())}% of GDP</b></div>
-      <div class="kv"><span>Parliament</span><b class="${coalitionSeats() >= 51 ? 'good' : 'bad'}">${coalitionSeats()}/100 seats</b></div>
+      <div class="kv"><span>GDP</span><b>${bigMoney(gdpReal())} ${S.lastGrowth !== undefined ? `<em class="${S.lastGrowth >= 0 ? 'up' : 'down'}">${sign(S.lastGrowth)}%</em>` : ''}</b></div>
+      <div class="kv"><span>Debt</span><b class="${debtPct() > (S.debtSoft || 80) + 20 ? 'bad' : ''}">${fmt(debtPct())}% of GDP</b></div>
+      <div class="kv"><span>Parliament</span><b class="${coalitionSeats() >= majority() ? 'good' : 'bad'}">${coalitionSeats()}/${S.parl.size || 100} seats</b></div>
       <div class="kv"><span>War risk</span><b class="${warRisk()[1]}">${warRisk()[0]}</b></div>
       ${promisesHTML()}
-      <button class="btn primary big wide" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % 8 === 0 ? (S.term === 2 ? 'Finish presidency →' : 'End term → election') : 'End half-year →'}</button>
+      <button class="btn primary big wide" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish your time in office →' : 'End term → election') : 'End half-year →'}</button>
     </div>
     <div class="card">
       ${mapSVG('gov')}
@@ -1270,14 +1355,14 @@ function renderOver() {
       <div><span>Average approval</span><b>${fmt(R.avgAp)}%</b></div>
       <div><span>Development</span><b>${devLevel(R.dev)} (${fmt(R.dev)})</b></div>
       <div><span>Population</span><b>${fmt(S.pop, 1)}M</b></div>
-      <div><span>Final GDP</span><b>$${fmt(S.gdp, 1)}B</b></div>
+      <div><span>Final GDP</span><b>${bigMoney(gdpReal())}</b></div>
       <div><span>Final debt</span><b>${fmt(debtPct())}% of GDP</b></div>
       <div><span>Projects completed</span><b>${S.built}</b></div>
       <div><span>Homes sold to citizens</span><b>${S.housing.sold.toLocaleString()}</b></div>
       <div><span>Laws passed</span><b>${S.laws.length}</b></div>
       <div><span>Promises kept</span><b>${R.kept} / ${R.kept + R.broken}</b></div></div>
       <div class="statchanges">${SK.map(k => `<span class="chip">${STATS[k].icon} ${fmt(S.stats[k])}</span>`).join('')}</div>`
-      : `<p class="center muted">You won ${S.lastElection.evP} electoral votes and ${fmt(S.lastElection.pvShare, 1)}% of the popular vote. Try a different strategy — promises, rallies in big regions, and a good debate night.</p>`}
+      : `<p class="center muted">You won ${S.lastElection.evP} of 100 ${ROLE.ev} and ${fmt(S.lastElection.pvShare, 1)}% of the popular vote. Try a different strategy — promises, rallies in big regions, and a good debate night.</p>`}
     <div class="menu row">
       ${Cloud.enabled ? `<button class="btn" id="submitBtn" data-act="submitScore" ${R.submitted ? 'disabled' : ''}>${R.submitted ? '✓ Submitted' : '🌍 Submit to online Hall of Fame'}</button>` : ''}
       <button class="btn primary big" data-act="playAgain">Play again</button>
@@ -1328,7 +1413,9 @@ const ACT = {
   camp: d => campAction(d.id),
   endWeek: () => endWeek(),
   afterElection: () => afterElection(),
-  tab: d => { UI.tab = d.id; render(); },
+  tab: d => { UI.tab = d.id; render(); if (d.scroll) { const t = $('.tabs'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+  buildPick: () => buildPick(),
+  speechPick: () => speechPick(),
   law: d => proposeLaw(d.id),
   speech: d => speech(d.g),
   tender: d => startTender(d.id),
@@ -1341,6 +1428,7 @@ const ACT = {
   alliance: () => toggleAlliance(),
   endTurn: () => endTurn(),
   submitScore: () => submitCloud(),
+  setCountry: d => { UI.setup.countryId = d.id; applyCountry(d.id); render(); },
   playAgain: () => { S = null; UI.speech = null; UI.screen = 'setup'; render(); },
   menu: () => openMenu(),
 };
@@ -1357,6 +1445,8 @@ function openMenu() {
 }
 function resume() {
   UI.walkFrom = null; UI.speech = 'Welcome back!';
+  applyCountry(S.countryId || 'veloria');
+  if (!S.scale) S.scale = 1; if (!S.termTurns) S.termTurns = 8; if (!S.maxTerms) S.maxTerms = 2;
   if (S.stats) initGovExtras();
   if (!S.buildings) S.buildings = JSON.parse(JSON.stringify(START_BUILDINGS));
   if (S.phase === 'campaign') UI.screen = 'campaign';
