@@ -457,3 +457,60 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
   .evbig b { font-size: 2.2rem; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- Maldives: real-geography atoll map ---------- */
+.zones polygon { fill-opacity: .36; stroke: rgba(255,255,255,.28); stroke-width: 1; stroke-dasharray: 4 3; }
+.region.sel .zones polygon, .zones .region.sel polygon { fill-opacity: .42; }
+.atoll .reef { fill: rgba(94,234,212,.10); stroke: #5eead4; stroke-width: 1.6; stroke-dasharray: 2.5 1.6; }
+.atoll .lagoon { fill: rgba(56,189,248,.28); stroke: none; }
+.atoll .aname { font-size: 6.6px; fill: #cffafe; font-weight: 600; paint-order: stroke; stroke: rgba(4,20,36,.85); stroke-width: 2.2px; pointer-events: none; }
+.atoll .athaana { font-family: "MV Faseyha", "Faruma", "Noto Sans Thaana", sans-serif; font-size: 7px; font-weight: 700; fill: #fde68a; pointer-events: none; paint-order: stroke; stroke: rgba(4,20,36,.8); stroke-width: 1.6px; }
+.atoll { cursor: help; }
+.mvcity circle { fill: #fde68a; stroke: #7c2d12; stroke-width: 1; }
+.mvcity text { font-size: 7.6px; font-weight: 800; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.7); stroke-width: 2.4px; }
+.equator { stroke: #fbbf24; stroke-width: 1; stroke-dasharray: 6 4; opacity: .55; }
+.eqlbl { font-size: 7px; fill: #fbbf24; opacity: .85; }
+.ocean { font-size: 8px; fill: #5b8bb5; font-style: italic; letter-spacing: 1px; }
+.ocean.small { font-size: 6.5px; }
+.searoute { stroke: #93c5fd; stroke-width: 1; stroke-dasharray: 3 3; opacity: .45; }
+.searoute.hw { stroke: #fde68a; opacity: .8; }
+.atoll-list { font-size: 12px; margin: 6px 0 8px; padding: 8px 10px; background: rgba(45,212,191,.08); border: 1px solid rgba(94,234,212,.25); border-radius: 10px; }
+.atoll-list ul { margin: 4px 0 0; padding-left: 4px; list-style: none; }
+.atoll-list li { margin: 2px 0; }
+.atoll-list .thaana { display: inline-block; min-width: 22px; color: #fde68a; font-family: "MV Faseyha", "Faruma", "Noto Sans Thaana", sans-serif; font-weight: 700; }
+
+/* ---------- Manifesto tracker ---------- */
+.manifesto h3 { margin: 16px 0 8px; }
+.mtitle { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: linear-gradient(135deg, rgba(251,191,36,.14), rgba(59,130,246,.10)); border: 1px solid rgba(251,191,36,.3); }
+.mtitle > div:first-of-type { flex: 1; } .mtitle b { font-family: "Playfair Display", serif; font-size: 18px; display: block; } .mtitle small { color: var(--muted); }
+.mscore { text-align: center; } .mscore b { font-size: 22px; color: var(--gold); font-family: inherit; } .mscore small { display: block; font-size: 10px; }
+.mbar { height: 6px; margin: 8px 0; } .mbar > div { background: linear-gradient(90deg, #22c55e, #fbbf24); height: 100%; border-radius: 4px; }
+.next { display: grid; gap: 6px; }
+.nx { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(59,130,246,.10); border-left: 3px solid #60a5fa; }
+.nx span { font-size: 18px; } .nx p { flex: 1; margin: 0; font-size: 13px; }
+.mcard { border: 1px solid var(--line, rgba(255,255,255,.1)); border-radius: 12px; padding: 10px 12px; margin: 8px 0; background: rgba(255,255,255,.03); }
+.mcard.kept { border-color: rgba(34,197,94,.5); background: rgba(34,197,94,.06); } .mcard.broken { border-color: rgba(239,68,68,.5); opacity: .8; }
+.mh { display: flex; align-items: center; gap: 10px; } .mh > div { flex: 1; } .mh b { display: block; } .mh small { color: var(--muted); font-size: 11px; }
+.mi { font-size: 24px; }
+.mstat { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.mstat.ok { background: rgba(34,197,94,.18); color: #86efac; } .mstat.bad { background: rgba(239,68,68,.18); color: #fca5a5; }
+.mstat.wait { background: rgba(148,163,184,.18); color: #cbd5e1; } .mstat.go { background: rgba(251,191,36,.18); color: #fde68a; }
+.mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; font-size: 12.5px; }
+@media (max-width: 700px) { .mgrid { grid-template-columns: 1fr; } }
+.msteps { margin: 4px 0; padding-left: 0; list-style: none; } .msteps li { margin: 2px 0; color: var(--muted); } .msteps li.done { color: #86efac; }
+.fxrow { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.mact { margin-top: 8px; display: flex; gap: 6px; }
+.fin-t { width: 100%; border-collapse: collapse; font-size: 12.5px; } .fin-t td, .fin-t th { padding: 6px 6px; border-bottom: 1px solid rgba(255,255,255,.07); text-align: left; vertical-align: top; }
+.fin-t th { color: var(--muted); font-weight: 600; font-size: 11px; } .nowrap { white-space: nowrap; }
+.mdec td:last-child { min-width: 150px; }
+.linkbtn { background: none; border: 0; color: #93c5fd; cursor: pointer; font-size: 11px; padding: 0 0 0 6px; text-decoration: underline; }
+
+/* ---------- Money & banks ---------- */
+.cb-card { padding: 10px 12px; border-radius: 12px; background: rgba(34,197,94,.07); border: 1px solid rgba(34,197,94,.25); margin-bottom: 8px; }
+.cb-h { display: flex; gap: 10px; align-items: center; font-size: 22px; } .cb-h b { font-size: 15px; display: block; } .cb-h small { font-size: 11px; color: var(--muted); }
+.money h3 { margin: 14px 0 6px; }
+.fin-act b small { color: var(--gold); margin-left: 4px; }
+.banks { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
+.bank { padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.bank b { display: block; font-size: 13px; } .bank small { color: var(--muted); font-size: 11px; }
+.atoll-d summary { cursor: pointer; font-size: 12px; color: #5eead4; margin: 4px 0; }

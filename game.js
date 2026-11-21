@@ -22,7 +22,7 @@ const GK = Object.keys(GROUPS), SK = Object.keys(STATS), RK = REGIONS.map(r => r
 const partyById = id => PARTIES.find(p => p.id === id);
 const reg = id => REGIONS.find(r => r.id === id);
 const comp = id => COMPANIES.find(c => c.id === id);
-const centroid = r => ({ x: avg(r.pts.map(p => p[0])), y: avg(r.pts.map(p => p[1])) });
+const centroid = r => r.lab ? { x: r.lab[0], y: r.lab[1] } : ({ x: avg(r.pts.map(p => p[0])), y: avg(r.pts.map(p => p[1])) });
 const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const lerpColor = (a, b, t) => { const A = hex(a), B = hex(b); t = clamp(t, 0, 1); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
 const approvalColor = v => { const t = clamp(v, 20, 80); return t < 50 ? lerpColor('#dc2626', '#f59e0b', (t - 20) / 30) : lerpColor('#f59e0b', '#16a34a', (t - 50) / 30); };
@@ -39,7 +39,13 @@ function applyCountry(id) {
     const base = VELORIA_REGIONS[i], o = COUNTRY.regions ? COUNTRY.regions[r.id] : null;
     Object.assign(r, base, { mix: { ...base.mix }, city: [...base.city] });
     if (o) Object.assign(r, o, { mix: { ...o.mix }, city: [base.city[0], base.city[1], o.city] });
+    if (o && COUNTRY.geo) {   // place the region's main town at its real latitude/longitude
+      const c = (COUNTRY.cities || []).find(x => x[4] === r.id && x[0].startsWith(o.city)), a = (COUNTRY.atolls || []).find(x => x[2] === o.city);
+      const ll = c ? [c[1], c[2]] : a ? [a[3], a[4]] : null;
+      if (ll) r.city = [...COUNTRY.geo(ll), o.city];
+    }
   });
+  COMPANIES.forEach(c => { c.base = c.base || { name: c.name, tag: c.tag, icon: c.icon, spec: c.spec }; Object.assign(c, c.base, (COMPANY_LOCAL[COUNTRY.id] || {})[c.id] || {}); });
   if (typeof NAT !== 'undefined') GK.forEach(g => NAT[g] = REGIONS.reduce((t, r) => t + r.mix[g] * r.pop, 0) / 100);
   NEIGHBOR = COUNTRY.fictional ? 'Draskor Federation' : 'Hostile Coalition';
   const pres = COUNTRY.system === 'presidential';
@@ -251,7 +257,7 @@ function newGame() {
     country: COUNTRY.fictional ? (su.country.trim() || 'Republic of Veloria') : COUNTRY.name,
     scale: COUNTRY.gdp / 100, pop: COUNTRY.pop, termTurns: COUNTRY.termYears * 2, maxTerms: COUNTRY.termLimit || 3,
     player: { name: su.name.trim() || 'Alex Morgan', party: su.party, look: { ...su.look } },
-    opp: { name: pick(OPP_NAMES), party: pick(PARTIES.filter(p => p.id !== su.party)).id, look: randomLook() },
+    opp: { name: pick(oppNames()), party: pick(PARTIES.filter(p => p.id !== su.party)).id, look: randomLook() },
     term: 0, turn: 0, served: 0, promises: [], laws: [], news: [], hist: [], built: 0,
     buildings: startBuildingsFor(COUNTRY),
   };
@@ -275,9 +281,10 @@ function startCampaign(re) {
       c.symP[p.g] -= 12; p.broken = true;
       news(`${GROUPS[p.g].name} furious: “${PROMISES[p.g].text}” promise broken`);
     });
+    Manifesto.breakUnkept(c);
   }
   const used = [S.player.name, S.opp.name];
-  c.minor = PARTIES.filter(p => p.id !== S.player.party && p.id !== S.opp.party).map(p => { const name = pick(OPP_NAMES.filter(n => !used.includes(n))); used.push(name); return { name, party: p.id, look: randomLook() }; });
+  c.minor = PARTIES.filter(p => p.id !== S.player.party && p.id !== S.opp.party).map(p => { const name = pick(oppNames().filter(n => !used.includes(n))); used.push(name); return { name, party: p.id, look: randomLook() }; });
   S.camp = c; S.phase = 'campaign'; UI.screen = 'campaign'; UI.walkFrom = null;
 }
 
@@ -379,7 +386,7 @@ async function debate() {
 }
 function startCampaignMinors(c) {
   const used = [S.player.name, S.opp.name];
-  c.minor = PARTIES.filter(p => p.id !== S.player.party && p.id !== S.opp.party).map(p => { const name = pick(OPP_NAMES.filter(n => !used.includes(n))); used.push(name); return { name, party: p.id, look: randomLook() }; });
+  c.minor = PARTIES.filter(p => p.id !== S.player.party && p.id !== S.opp.party).map(p => { const name = pick(oppNames().filter(n => !used.includes(n))); used.push(name); return { name, party: p.id, look: randomLook() }; });
 }
 
 async function campEvent() {
@@ -499,6 +506,7 @@ async function afterElection() {
   }
   S.parl = makeParliament(S.lastElection.pvShare);
   S.promises.push(...newP.map(g => ({ g, term: S.term })));
+  Manifesto.takeOffice();
   delete S.camp; delete S.elec;
   S.phase = 'govern'; S.lawThisTurn = false; S.diploThisTurn = false; S.pendingEvent = true;
   S.statsPrev = { ...S.stats }; S.gaPrev = { ...S.ga };
@@ -757,6 +765,7 @@ async function endTurn() {
   if (UI.busy || S.pendingEvent) return; UI.busy = true;
   try {
     const a0 = approval(), r = simulateTurn(), a1 = approval();
+    r.msgs.push(...Money.step(r));
     say(a1 >= a0 ? 'Good news this half-year.' : 'Tough months. We must do better.');
     S.diploThisTurn = false;
     render();
@@ -776,7 +785,7 @@ async function endTurn() {
     if (ap < 25) { const removed = await impeachment(ap); if (removed) return gameOver('impeached'); }
     if (S.turn >= TT() * MAXT()) return gameOver('retired');
     if (S.turn % TT() === 0) {
-      S.opp = { name: pick(OPP_NAMES.filter(n => n !== S.opp.name)), party: pick(PARTIES.filter(p => p.id !== S.player.party)).id, look: randomLook() };
+      S.opp = { name: pick(oppNames().filter(n => n !== S.opp.name)), party: pick(PARTIES.filter(p => p.id !== S.player.party)).id, look: randomLook() };
       await infoModal('🗳️', 'Election season!', `<p>Your term is ending. <b>${esc(S.opp.name)}</b> of the ${partyById(S.opp.party).name} wants your job. Parliament is up for election too.</p><p>Your approval of <b>${fmt(ap)}%</b> sets your starting position. Projects you built help you in those regions. Broken promises will cost you.</p>`, 'Start re-election campaign');
       startCampaign(true); say('Four more years? Let\'s earn it.'); save(); render(); return;
     }
@@ -811,8 +820,9 @@ function speech(g) { return Speech.give(g); }
 
 // ---------- game over & legacy ----------
 function legacy(reason) {
-  const kept = S.promises.filter(p => S.laws.includes(PROMISES[p.g].law)).length;
-  const broken = S.promises.length - kept;
+  const pc = Manifesto.counts();
+  const kept = S.promises.filter(p => S.laws.includes(PROMISES[p.g].law)).length + pc.kept;
+  const broken = S.promises.length + (S.pledges || []).length - kept;
   const avgAp = avg(S.hist || []);
   const statsAvg = S.stats ? avg(SK.map(k => S.stats[k])) : 0;
   const dev = S.stats ? devIndex() : 0;
@@ -886,6 +896,36 @@ function renderTicker() {
   el.innerHTML = items.map(n => `<span>${esc(n)}</span>`).join('<i>◆</i>');
 }
 
+// Real-geography layer for archipelagos (Maldives): reef rings at true lat/long, Thaana atoll codes, cities, Equator
+function atollLayer() {
+  const G = COUNTRY.geo, eq = G([0, 73])[1];
+  const rings = COUNTRY.atolls.map(([code, name, cap, lat, lon, rid, rx, ry, th, trad]) => {
+    const [x, y] = G([lat, lon]), left = (x < 215 || code === 'K') && code !== 'S';
+    return `<g class="atoll"><title>${name} Atoll (${th}) — ${trad}\nCapital island: ${cap}</title>
+      <ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="reef"/><ellipse cx="${x}" cy="${y}" rx="${Math.max(1, rx - 3)}" ry="${Math.max(1, ry - 3)}" class="lagoon"/>
+      <text x="${left ? x - rx - 3 : x + rx + 3}" y="${y + 3}" style="text-anchor:${left ? 'end' : 'start'}" class="aname">${name}</text>
+      <text x="${x}" y="${y + 2.6}" style="text-anchor:middle" class="athaana">${th}</text></g>`;
+  }).join('');
+  const cities = (COUNTRY.cities || []).map(([n, lat, lon, note, rid, side], i) => {
+    const [x, y] = G([lat, lon]), cap = i === 0, hide = n === 'Hulhumalé';
+    return `<g class="city mvcity"><title>${n} — ${note}</title><circle cx="${x}" cy="${y}" r="${cap ? 4 : 2.6}"/>${hide ? '' : `<text x="${side === 'L' ? x - 6 : x + 6}" y="${side === 'L' ? y - 5 : y - 4}" style="text-anchor:${side === 'L' ? 'end' : 'start'}">${cap ? '★ ' : ''}${n}</text>`}</g>`;
+  }).join('');
+  return `<line x1="20" y1="${eq}" x2="330" y2="${eq}" class="equator"/><text x="22" y="${eq - 3}" class="eqlbl" style="text-anchor:start">Equator 0°</text>
+    <text x="22" y="150" class="ocean" style="text-anchor:start">Indian Ocean</text>
+    <g class="atolls">${rings}</g>${cities}`;
+}
+// Rival candidates get names from the chosen country (Maldivian names in the Maldives)
+function atollList(rid) {
+  if (!COUNTRY.atolls) return '';
+  const at = COUNTRY.atolls.filter(a => a[5] === rid), ci = (COUNTRY.cities || []).filter(c => c[4] === rid);
+  return `<div class="atoll-list">${ci.length ? `<div><b>🏙️ Cities:</b> ${ci.map(c => `<span title="${c[3]}">${c[0]}</span>`).join(' · ')}</div>` : ''}
+    <div><b>🏝️ Atolls:</b></div><ul>${at.map(a => `<li><span class="thaana">${a[8]}</span> <b>${a[1]}</b> <small class="muted">${a[9]} · capital ${a[2]}</small></li>`).join('')}</ul></div>`;
+}
+function oppNames() {
+  if (!COUNTRY || COUNTRY.fictional || typeof personName !== 'function') return OPP_NAMES;
+  const out = new Set(); for (let i = 0; out.size < 12 && i < 300; i++) out.add(personName(i % 3 === 0 ? 'f' : 'm'));
+  return [...out];
+}
 function mapSVG(mode) {
   const pp = partyById(S.player.party), op = S.opp ? partyById(S.opp.party) : pp;
   const shown = mode === 'elec' ? S.elec.order.slice(0, UI.revealed) : [];
@@ -905,9 +945,10 @@ function mapSVG(mode) {
   const hasHw = id => S.buildings && S.buildings[id].includes('highway');
   const roads = ROADS.map(([a, b]) => {
     const A = reg(a).city, B = reg(b).city, hw = hasHw(a) || hasHw(b);
-    return `<line x1="${A[0]}" y1="${A[1]}" x2="${B[0]}" y2="${B[1]}" class="road ${hw ? 'hw' : ''}"/>`;
+    return `<line x1="${A[0]}" y1="${A[1]}" x2="${B[0]}" y2="${B[1]}" class="${COUNTRY.atolls ? 'searoute' : 'road'} ${hw ? 'hw' : ''}"/>`;
   }).join('') + (S.laws && S.laws.includes('rail') ? ROADS.slice(0, 4).map(([a, b]) => { const A = reg(a).city, B = reg(b).city; return `<line x1="${A[0]}" y1="${A[1]}" x2="${B[0]}" y2="${B[1]}" class="rail"/>`; }).join('') : '');
-  const cities = REGIONS.map(r => `<g class="city"><circle cx="${r.city[0]}" cy="${r.city[1]}" r="${r.id === 'capital' ? 4 : 3}"/><text x="${r.city[0] + 6}" y="${r.city[1] + 3}">${r.id === 'capital' ? '★ ' : ''}${r.city[2]}</text></g>`).join('');
+  const geo = COUNTRY.atolls ? atollLayer() : '';
+  const cities = geo ? '' : REGIONS.map(r => `<g class="city"><circle cx="${r.city[0]}" cy="${r.city[1]}" r="${r.id === 'capital' ? 4 : 3}"/><text x="${r.city[0] + 6}" y="${r.city[1] + 3}">${r.id === 'capital' ? '★ ' : ''}${r.city[2]}</text></g>`).join('');
   // buildings & construction sites
   let blds = '';
   if (S.buildings) REGIONS.forEach(r => {
@@ -942,7 +983,7 @@ function mapSVG(mode) {
     <rect width="400" height="300" rx="14" fill="url(#sea)"/>
     <path d="M10 40 q10 -6 20 0 t20 0 M350 260 q10 -6 20 0 t20 0 M20 270 q10 -6 20 0 t20 0 M360 20 q10 -6 20 0" stroke="#1e4a73" stroke-width="2" fill="none" stroke-linecap="round"/>
     <text x="8" y="292" class="neighbor">← ${NEIGHBOR}</text>
-    <g filter="url(#sh)">${polys}</g>
+    <g filter="url(#sh)" class="${geo ? 'zones' : ''}">${polys}</g>${geo}
     <g class="roads">${roads}</g>${cities}${blds}${navy}${planes}
     ${oppMark}${walker}</svg>`;
 }
@@ -1042,7 +1083,7 @@ function renderCampaign() {
     <div class="card">
       <h3>📍 ${r.name} <small class="muted">${r.pop}% of ${ROLE.ev} · ${r.city[2]}</small></h3>
       ${pollBar(pr.p, pr.u, pr.o, 'sm')}
-      <p class="muted small">${r.desc}</p>
+      <p class="muted small">${r.desc}</p>${atollList(r.id)}
       <div class="mix">${GK.filter(g => r.mix[g] > 0).map(g => `<span>${GROUPS[g].icon} ${Math.round(r.mix[g] * 100)}%</span>`).join('')}</div>
       <p class="muted small">👆 Use the action bar under the city view — every action plays out right there.</p>
     </div>
@@ -1089,8 +1130,8 @@ function chartSVG() {
     <div class="chart-legend muted small"><span>— 50%</span><span class="bad">— 25% impeachment risk</span><span>| re-election</span></div>`;
 }
 function promisesHTML() {
-  if (!S.promises.length) return '';
-  return `<div class="plist"><div class="lbl">🤝 Promises</div>${S.promises.map(p => {
+  if (!S.promises.length) return (S.pledges || []).length ? `<div class="plist"><button class="linkbtn" data-act="tab" data-id="agenda" data-scroll="1">📜 Your manifesto →</button></div>` : '';
+  return `<div class="plist"><div class="lbl">🤝 Promises <button class="linkbtn" data-act="tab" data-id="agenda" data-scroll="1">full manifesto →</button></div>${S.promises.map(p => {
     const kept = S.laws.includes(PROMISES[p.g].law);
     return `<div class="promise ${kept ? 'kept' : p.broken ? 'broken' : ''}">${kept ? '✅' : p.broken ? '❌' : '⏳'} ${PROMISES[p.g].text}</div>`; }).join('')}</div>`;
 }
@@ -1129,7 +1170,7 @@ function buildHTML() {
   const counts = {}; here.forEach(t => counts[t] = (counts[t] || 0) + 1);
   return `${regionPicker()}
   <div class="rinfo"><b>${r.name}</b> <span class="muted small">· ${r.city[2]} · approval ${fmt(regionApproval(r))}%</span>
-    <div class="have">${Object.keys(counts).length ? Object.entries(counts).map(([t, n]) => `<span class="chip">${PROJECTS[t].icon} ${PROJECTS[t].name}${n > 1 ? ' ×' + n : ''}</span>`).join('') : '<span class="muted small">Nothing built here yet.</span>'}</div></div>
+    <div class="have">${Object.keys(counts).length ? Object.entries(counts).map(([t, n]) => `<span class="chip">${PROJECTS[t].icon} ${PROJECTS[t].name}${n > 1 ? ' ×' + n : ''}</span>`).join('') : '<span class="muted small">Nothing built here yet.</span>'}</div>${COUNTRY.atolls ? `<details class="atoll-d"><summary>🏝️ Atolls & cities in ${r.short}</summary>${atollList(r.id)}</details>` : ''}</div>
   ${S.projects.length ? `<h3>🚧 Under construction <small class="muted">${S.projects.length}/${MAX_PROJECTS}</small></h3>${S.projects.map(p => {
     const P = PROJECTS[p.type], c = comp(p.company), done = p.total - p.turnsLeft;
     return `<div class="pjob"><span class="pi">${P.icon}</span><div class="pt"><b>${P.name} · ${reg(p.region).short}</b><small>${c.icon} ${c.name} · <span class="stars">${stars(p.q)}</span>${p.delays ? ` · <span class="bad">${p.delays} delay${p.delays > 1 ? 's' : ''}</span>` : ''}</small>
@@ -1140,7 +1181,7 @@ function buildHTML() {
     return `<button class="proj-btn" data-act="tender" data-id="${k}" ${can ? '' : 'disabled'} title="${why}">
       <span class="pi">${P.icon}</span><span class="pt"><b>${P.name}</b><small>${why || P.desc}</small></span><span class="pc">${money(P.cost)}<small>${P.turns} turns</small></span></button>`;
   }).join('')}</div>
-  <details class="companies"><summary>🏢 Construction companies</summary>${COMPANIES.map(c => `<div class="crow"><span>${c.icon} ${c.name} <span class="tag-c ${c.tag.toLowerCase()}">${c.tag}</span></span><div class="bar"><div style="width:${S.companies[c.id]}%;background:${approvalColor(S.companies[c.id])}"></div></div><b>${fmt(S.companies[c.id])}</b></div>`).join('')}
+  <details class="companies"><summary>🏢 Construction companies</summary>${COMPANY_LOCAL[COUNTRY.id] ? '<p class="muted small">Real state-owned companies and foreign contractors bid alongside fictional ones. How each performs in the game is simulated, not a rating of the real company.</p>' : ''}${COMPANIES.map(c => `<div class="crow"><span>${c.icon} ${c.name} <span class="tag-c ${c.tag.toLowerCase()}">${c.tag}</span></span><div class="bar"><div style="width:${S.companies[c.id]}%;background:${approvalColor(S.companies[c.id])}"></div></div><b>${fmt(S.companies[c.id])}</b></div>`).join('')}
     <p class="muted small">Reputation rises when projects finish on time and falls with delays and defects. Better reputation = better bids.</p></details>`;
 }
 function housingHTML() {
@@ -1245,6 +1286,7 @@ function cityBar(camp) {
     return `<div class="cv-bar">
       <div class="cvb-info"><span class="ap">${'<i class="on"></i>'.repeat(c.ap)}${'<i></i>'.repeat(3 - c.ap)}</span><b>💵 $${Math.round(c.funds)}M</b><small class="muted">in ${r.short}</small></div>
       ${Object.entries(CAMP_ACTIONS).map(([id, a]) => `<button class="cvb" data-act="camp" data-id="${id}" title="${a.desc}" ${c.ap <= 0 || c.funds < a.cost || (id === 'promise' && !promisesLeft()) ? 'disabled' : ''}><span>${a.icon}</span>${(n => n[0].toUpperCase() + n.slice(1))(a.name.replace('Make a ', '').replace('Hold a ', ''))}<small>${a.cost ? '$' + a.cost + 'M' : 'free'}</small></button>`).join('')}
+      <button class="cvb" data-act="manifesto"><span>📜</span>Manifesto<small>${(c.newPledges || []).length}/3 pledges</small></button>
       <button class="btn primary cvb-end" data-act="endWeek">${c.week === c.weeks ? 'Election Day 🗳️' : 'End week →'}</button></div>`;
   }
   return `<div class="cv-bar">
@@ -1294,10 +1336,10 @@ function cityCard() {
     ${cityBar(camp)}
   </div>`;
 }
-const TABS = [['budget', '💰 Budget'], ['build', '🏗️ Build'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];
+const TABS = [['agenda', '📜 Manifesto'], ['money', '🏦 Money'], ['budget', '💰 Budget'], ['build', '🏗️ Build'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];
 function renderGovern() {
   const ap = approval(), pp = partyById(S.player.party), inTerm = (S.turn - 1) % TT() + 1;
-  const tabHTML = { budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
+  const tabHTML = { agenda: () => Manifesto.html(), money: () => Money.html(), budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
   return `${cityCard()}<div class="grid3 gov">
     <div class="card leader">
       <div class="portrait">${bubble()}${avatarSVG(S.player.look, mood(), 110, 'float')}</div>
@@ -1408,6 +1450,8 @@ const ACT = {
   law: d => proposeLaw(d.id),
   speech: d => speech(d.g),
   tender: d => startTender(d.id),
+  finAct: d => Money.decide(d.id),
+  manifesto: () => Manifesto.campaignDoc(),
   housePrice: d => { S.housing.price = d.id; save(); render(); },
   buildHousing: () => { UI.tab = 'build'; render(); startTender('housing'); },
   invite: d => inviteCoalition(d.id),

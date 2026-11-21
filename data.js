@@ -433,6 +433,19 @@ const COMPANIES = [
   { id: 'crown',  name: 'Golden Crown Builders',  icon: '👑', tag: 'Shady',   spec: 'all', price: 0.9, quality: 50, speed: 60, shady: true },
 ];
 
+// Real contractors per country (performance in the game is simulated — not a rating of the real company).
+// The budget and "shady" bidders always stay fictional.
+const COMPANY_LOCAL = {
+  mv: {
+    atlas: { name: 'HDC — Housing Development Corporation', icon: '🏢', tag: 'State', spec: ['housing', 'park', 'school'] },
+    sky:   { name: 'AFCONS Infrastructure (India)', icon: '🌉', tag: 'Foreign', spec: ['highway', 'port', 'airport'] },
+    volt:  { name: 'STELCO — State Electric Company', icon: '⚡', tag: 'State', spec: ['solar', 'coal'] },
+    nat:   { name: 'MTCC — Maldives Transport & Contracting Co.', icon: '⛴️', tag: 'State' },
+    orion: { name: 'CCCC — China Communications Construction', icon: '🌍', tag: 'Foreign' },
+    medi:  { name: 'Atoll MediBuild (fictional)' }, iron: { name: 'Coastguard Works (fictional)' },
+  },
+};
+
 // Price policy for selling government-built homes. price = $B per 1,000 homes.
 const HOUSE_PRICES = {
   affordable: { name: 'Affordable', icon: '🙂', price: 0.8, demand: 1.6, desc: 'Sells fast. Workers & youth love it. Loses money.' },
@@ -512,14 +525,42 @@ const COUNTRIES = [
   { id: 'mv', name: 'Maldives', flag: '🇲🇻', system: 'presidential', title: 'President', termYears: 5, termLimit: 2,
     seats: 93, parl: 'People\'s Majlis', threat: 15, pop: 0.53, gdp: 7.8, debt: 129.7, rate: .02, landlocked: false, infra: 45,
     stats: { economy: 52, health: 66, education: 58, security: 55, environment: 55, freedom: 60, housing: 38 }, mil: { army: 15, air: 5, navy: 15 },
-    note: 'An island nation of 1,192 coral islands. Tourism drives the economy; public debt is very high and rising seas are an existential threat. 5-year presidential terms, unicameral People\'s Majlis.',
+    nameLocal: 'Dhivehi Raajje', note: 'Dhivehi Raajje — an island nation of 1,192 coral islands in 20 administrative atolls and 5 cities. Tourism drives the economy; public debt is very high and rising seas are an existential threat. 5-year presidential terms, unicameral People\'s Majlis.',
     regions: {
-      capital: _r('Greater Malé (Malé, Hulhumalé, Villimalé)', 'Malé', 'Malé', 41, 'capital', true, [.30, .22, .02, .30, .16], 'One of the most densely populated cities on Earth — government, port and airport.'),
-      north: _r('Northern Atolls', 'North', 'Kulhudhuffushi', 20, 'coast', true, [.28, .08, .22, .24, .18], 'Fishing communities, a new regional airport and island harbours.'),
-      coast: _r('Central Atolls & resort islands', 'Resorts', 'Maafushi', 12, 'coast', true, [.40, .22, .06, .22, .10], 'World-famous resorts, guesthouses and dive sites — the tourism heartland.'),
-      farm: _r('South-Central Atolls', 'South-Central', 'Fonadhoo', 12, 'coast', true, [.26, .06, .30, .20, .18], 'Fishing, small farms and the largest island lagoons.'),
-      high: _r('Addu City & Fuvahmulah', 'Addu', 'Addu City', 15, 'coast', true, [.30, .12, .14, .26, .18], 'The southern hub with an international airport and a historic causeway link road.'),
-    } },
+      capital: Object.assign(_r('Maalé City & Kaafu Atoll (Malé Atholhu)', 'Maalé', 'Maalé', 43, 'capital', true, [.30, .22, .02, .30, .16], 'The capital: Malé, Hulhumalé and Villimalé, Velana International Airport, and guesthouse islands like Maafushi in Kaafu Atoll.'),
+        { pts: [[206,92],[318,92],[318,140],[206,140]], lab: [352,112] }),
+      north: Object.assign(_r('Uthuru — Northern Atolls (Haa Alif to Lhaviyani)', 'Uthuru', 'Kulhudhuffushi', 21, 'coast', true, [.28, .08, .22, .24, .18], 'Seven northern atolls: fishing communities, Kulhudhuffushi City, regional airports and island harbours.'),
+        { pts: [[96,6],[318,6],[318,92],[96,92]], lab: [352,46] }),
+      coast: Object.assign(_r('Medhu — Central Atolls & resort islands', 'Medhu', 'Mahibadhoo', 11, 'coast', true, [.40, .22, .06, .22, .10], 'Alif Alif, Alif Dhaal, Vaavu, Meemu, Faafu and Dhaalu: world-famous resorts, dive sites and manta bays.'),
+        { pts: [[96,92],[206,92],[206,140],[318,140],[318,178],[96,178]], lab: [352,160] }),
+      farm: Object.assign(_r('Mathi Dhekunu — Thaa, Laamu & Huvadhu Atoll', 'Huvadhu', 'Thinadhoo', 12, 'coast', true, [.26, .06, .30, .20, .18], 'Thaa, Laamu and the giant Huvadhu Atoll (Gaafu Alif & Gaafu Dhaalu): fishing, farming islands and Thinadhoo City.'),
+        { pts: [[96,178],[318,178],[318,262],[96,262]], lab: [352,212] }),
+      high: Object.assign(_r('Dhekunu — Addu City & Fuvahmulah City', 'Addu', 'Addu City', 13, 'coast', true, [.30, .12, .14, .26, .18], 'The far south across the Equator: Addu City (Hithadhoo, Feydhoo, Gan with its international airport) and the one-island atoll Fuvahmulah.'),
+        { pts: [[96,262],[318,262],[318,296],[96,296]], lab: [352,268] }),
+    },
+    // 20 administrative atolls + Malé City. Positions come from real latitude/longitude.
+    atolls: [
+      ['HA', 'Haa Alif', 'Dhidhdhoo', 6.95, 72.95, 'north', 10, 9, 'ހއ', 'Thiladhunmathi Uthuruburi'], ['HDh', 'Haa Dhaalu', 'Kulhudhuffushi', 6.62, 73.05, 'north', 10, 8, 'ހދ', 'Thiladhunmathi Dhekunuburi'],
+      ['Sh', 'Shaviyani', 'Funadhoo', 6.3, 73.2, 'north', 8, 8, 'ށ', 'Miladhunmadulu Uthuruburi'], ['N', 'Noonu', 'Manadhoo', 5.85, 73.4, 'north', 8, 9, 'ނ', 'Miladhunmadulu Dhekunuburi'],
+      ['R', 'Raa', 'Ungoofaaru', 5.55, 72.97, 'north', 9, 10, 'ރ', 'Maalhosmadulu Uthuruburi'], ['Lh', 'Lhaviyani', 'Naifaru', 5.33, 73.52, 'north', 7, 6, 'ޅ', 'Faadhippolhu'],
+      ['B', 'Baa', 'Eydhafushi', 5.1, 73.05, 'north', 9, 7, 'ބ', 'Maalhosmadulu Dhekunuburi'], ['K', 'Kaafu', 'Thulusdhoo', 4.3, 73.47, 'capital', 9, 16, 'ކ', 'Malé Atholhu'],
+      ['AA', 'Alif Alif', 'Rasdhoo', 4.1, 72.85, 'coast', 9, 10, 'އއ', 'Ari Atholhu Uthuruburi'], ['ADh', 'Alif Dhaal', 'Mahibadhoo', 3.68, 72.85, 'coast', 9, 7, 'އދ', 'Ari Atholhu Dhekunuburi'],
+      ['V', 'Vaavu', 'Felidhoo', 3.5, 73.5, 'coast', 8, 7, 'ވ', 'Felidhu Atholhu'], ['F', 'Faafu', 'Nilandhoo', 3.2, 72.92, 'coast', 7, 6, 'ފ', 'Nilandhe Atholhu Uthuruburi'],
+      ['M', 'Meemu', 'Muli', 2.95, 73.55, 'coast', 6, 8, 'މ', 'Mulaku Atholhu'], ['Dh', 'Dhaalu', 'Kudahuvadhoo', 2.82, 72.92, 'coast', 7, 6, 'ދ', 'Nilandhe Atholhu Dhekunuburi'],
+      ['Th', 'Thaa', 'Veymandoo', 2.38, 73.12, 'farm', 11, 9, 'ތ', 'Kolhumadulu'], ['L', 'Laamu', 'Fonadhoo', 1.9, 73.42, 'farm', 7, 10, 'ލ', 'Hadhdhunmathi'],
+      ['GA', 'Gaafu Alif', 'Viligili', 0.65, 73.28, 'farm', 13, 8, 'ގއ', 'Huvadhu Atholhu Uthuruburi'], ['GDh', 'Gaafu Dhaalu', 'Thinadhoo', 0.38, 73.05, 'farm', 13, 8, 'ގދ', 'Huvadhu Atholhu Dhekunuburi'],
+      ['Gn', 'Gnaviyani', 'Fuvahmulah', -0.3, 73.42, 'high', 3, 4, 'ޏ', 'Fuvahmulah'], ['S', 'Seenu (Addu)', 'Hithadhoo', -0.63, 73.15, 'high', 8, 6, 'ސ', 'Addu Atholhu'],
+    ],
+    // official cities (Thinadhoo became the fifth city in 2023) + Hulhumalé
+    cities: [
+      ['Maalé', 4.175, 73.51, 'Capital city · about 212,000 people in Malé City (2022 census)', 'capital'],
+      ['Hulhumalé', 4.215, 73.54, 'Reclaimed island, part of Malé City', 'capital'],
+      ['Addu City', -0.6, 73.08, 'Second-largest city · about 25,000 people', 'high', 'L'],
+      ['Fuvahmulah City', -0.3, 73.42, 'A one-island atoll and city · about 9,000 people', 'high'],
+      ['Kulhudhuffushi City', 6.62, 73.07, 'Capital of Haa Dhaalu Atoll · about 10,000 people', 'north'],
+      ['Thinadhoo City', 0.53, 73.0, 'Capital of Gaafu Dhaalu Atoll · city since 2023', 'farm', 'L'],
+    ],
+    geo: ll => [Math.round(140 + (ll[1] - 72.6) * 120), Math.round(15 + (7.1 - ll[0]) * 35)] },
   { id: 'kz', name: 'Kazakhstan', flag: '🇰🇿', system: 'presidential', title: 'President', termYears: 7, termLimit: 1,
     seats: 98, parl: 'Mazhilis', pop: 20.4, gdp: 306, debt: 24.6, rate: .015, landlocked: false, infra: 48,
     stats: { economy: 58, health: 55, education: 60, security: 55, environment: 44, freedom: 60, housing: 50 }, mil: { army: 35, air: 25, navy: 10 },

@@ -64,6 +64,30 @@ Edit `COUNTRIES` in `data.js` to add more countries.
 - **Opening ceremonies**: when a project is finished, the city view shows a ribbon-cutting ceremony.
 - Flags are drawn in SVG so they also display on Windows (which has no emoji flags).
 
+## Manifesto, money & banks
+
+- **📜 Manifesto tab**: every promise and development pledge with *what to do* (step by step), *the effect when kept*,
+  progress bars, and a "What to do next" list. Cabinet decisions and financing decisions are tracked to completion
+  (bill enacted, tender launched, under construction, opened). On the campaign trail, the 📜 Manifesto button adds up to
+  3 development pledges; unbuilt pledges count as broken at the next election.
+- **🏦 Money tab**: the country's real central bank, currency regime and largest banks, with inflation, debt and risk.
+  The Maldives is modelled in detail: MMA, the rufiyaa peg (MVR 15.42/$), official reserves and import cover, the
+  black-market rate, a foreign-debt calendar (India currency swap, treasury bonds), MIRA taxes (G-GST 8%, T-GST 17%,
+  Green Tax) and financing decisions (swap rollover, dollar loans from banks, tax changes, Foreign Currency Act,
+  money printing, sukuk, IMF programme, open market operations). If reserves run out, the peg breaks.
+
+## The Maldives in detail
+
+- **Map** drawn from real latitude/longitude: all 20 administrative atolls with their Thaana code letters (ހއ, ހދ … ސ),
+  traditional atoll names (Thiladhunmathi, Miladhunmadulu, Huvadhu …) and capital islands, the 5 cities (Malé, Addu,
+  Fuvahmulah, Kulhudhuffushi, Thinadhoo), the Equator and sea routes. Regions use Dhivehi names (Uthuru, Medhu, Dhekunu).
+- **Maldivian names** for rivals, ministers and the newspaper.
+- **Cabinet** with the ministry titles from the April 2026 restructuring (e.g. Ministry of Finance and Public Enterprises,
+  Ministry of Tourism and Civil Aviation).
+- **Contractors**: real state-owned companies (HDC, MTCC, STELCO) and foreign contractors (AFCONS, CCCC) bid in
+  tenders. Their performance in the game is simulated; budget and "shady" bidders are always fictional.
+- Parties and candidates remain fictional.
+
 ## How to play
 
 **Campaign (8 weeks)**
@@ -115,6 +139,8 @@ city.js           animated city view + campaign scenes (canvas)
 stage.js          animated TV debate studio + confetti
 gov.js            bills, procurement, cabinet, newspaper, world economy
 scenes.js         flags, office, speeches, UN, summits, state visits, cabinet room
+money.js          central banks, banks, taxes, reserves, financing decisions
+agenda.js         manifesto & delivery tracker
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured
 firestore.rules   security rules for the leaderboard

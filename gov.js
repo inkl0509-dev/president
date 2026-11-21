@@ -17,7 +17,9 @@
 // ---------- people ----------
 const NAME_POOLS = {
   uz: { m: ['Aziz', 'Sardor', 'Jasur', 'Bekzod', 'Timur', 'Rustam', 'Farrukh', 'Otabek', 'Sherzod', 'Ulugbek'], f: ['Dilnoza', 'Nodira', 'Malika', 'Gulnora', 'Shahnoza', 'Kamola', 'Feruza', 'Zarina', 'Madina', 'Laylo'], l: ['Rakhimov', 'Tursunov', 'Nazarov', 'Usmonov', 'Ismoilov', 'Saidov', 'Khamidov', 'Ergashev', 'Yuldashev', 'Sobirov'], fem: 'a' },
-  mv: { m: ['Ahmed', 'Mohamed', 'Ibrahim', 'Hassan', 'Ali', 'Hussain', 'Moosa'], f: ['Aishath', 'Fathimath', 'Mariyam', 'Hawwa', 'Aminath', 'Shifa', 'Shaheena'], l: ['Rasheed', 'Naseem', 'Shareef', 'Waheed', 'Manik', 'Saleem', 'Latheef'] },
+  mv: { m: ['Ahmed', 'Mohamed', 'Ibrahim', 'Hassan', 'Ali', 'Hussain', 'Moosa', 'Abdulla', 'Ismail', 'Yoosuf', 'Adam', 'Ilyas', 'Shiyam', 'Nihad'],
+        f: ['Aishath', 'Fathimath', 'Mariyam', 'Hawwa', 'Aminath', 'Shifa', 'Shaheena', 'Mausooma', 'Nazima', 'Zeena', 'Raheema', 'Shazna'],
+        l: ['Rasheed', 'Naseem', 'Shareef', 'Manik', 'Saleem', 'Latheef', 'Zahir', 'Shakir', 'Fikry', 'Riyaz', 'Areef', 'Zameer', 'Mausoom', 'Didi'] },
   kz: { m: ['Askar', 'Nurlan', 'Daulet', 'Yerlan', 'Arman', 'Marat', 'Bauyrzhan'], f: ['Aigerim', 'Dana', 'Gulnar', 'Saule', 'Aliya', 'Zhanna', 'Asel'], l: ['Abenov', 'Omarov', 'Sadykov', 'Zhumabekov', 'Iskakov', 'Bekov', 'Seitov'], fem: 'a' },
   tr: { m: ['Emre', 'Mehmet', 'Burak', 'Can', 'Kerem', 'Murat'], f: ['Elif', 'Zeynep', 'Ayşe', 'Selin', 'Deniz', 'Ebru'], l: ['Yılmaz', 'Kaya', 'Demir', 'Şahin', 'Çelik', 'Aydın', 'Öztürk', 'Arslan'] },
   en: { m: ['James', 'Daniel', 'Michael', 'Robert', 'Thomas', 'David'], f: ['Sarah', 'Emily', 'Laura', 'Rachel', 'Olivia', 'Hannah'], l: ['Carter', 'Bennett', 'Hughes', 'Morgan', 'Fletcher', 'Reed', 'Walsh', 'Porter'] },
@@ -169,7 +171,7 @@ const World = (() => {
 // ============================================================
 const Paper = (() => {
   const short = () => S.country.replace(/^Republic of /, '');
-  const paperName = () => (S.paper = S.paper || pick([`The ${short()} Herald`, `${short()} Daily News`, `The ${short()} Tribune`, `The ${short()} Times`]));
+  const paperName = () => (S.paper = S.paper || pick(COUNTRY.id === 'mv' ? ['The Raajje Herald', 'Dhivehi Raajje Daily', 'The Maalé Tribune'] : [`The ${short()} Herald`, `${short()} Daily News`, `The ${short()} Tribune`, `The ${short()} Times`]));
   const annual = g => ((1 + g / 100) ** 2 - 1) * 100;
   function chg(now, before, d = 1, suffix = '', lowerIsGood = false) { const c = now - before; return `<em class="${(c >= 0) !== lowerIsGood ? 'up' : 'down'}">${c >= 0 ? '▲' : '▼'} ${Math.abs(c).toFixed(d)}${suffix}</em>`; }
   function show(r, a0, a1, w) {
@@ -240,17 +242,24 @@ const MINISTRIES = [
   { id: 'interior', title: 'Minister of Interior', icon: '🚓' },
   { id: 'defense', title: 'Minister of Defence', icon: '🛡️' },
   { id: 'foreign', title: 'Minister of Foreign Affairs', icon: '🌐' },
+  { id: 'tourism', title: 'Minister of Tourism', icon: '🏝️', only: ['mv'] },
 ];
 const MIN_TITLES = {
+  // Maldives: ministries as restructured by the President's Office in April 2026
+  mv: { finance: 'Minister of Finance and Public Enterprises', economy: 'Minister of Economic Development, Transport and Trade', labour: 'State Minister for Labour (Homeland Security, Labour & Technology)',
+    health: 'Minister of Health, Family and Welfare', education: 'Minister of Education, Higher Education and Skills Development', infra: 'Minister of Infrastructure, Housing and Urban Development',
+    housing: 'State Minister for Housing (Infrastructure, Housing & Urban Development)', energy: 'Minister of Climate Change, Environment and Energy', interior: 'Minister of Homeland Security, Labour and Technology',
+    defense: 'Minister of Defence', foreign: 'Minister of Foreign Affairs', tourism: 'Minister of Tourism and Civil Aviation' },
   us: { finance: 'Secretary of the Treasury', economy: 'Secretary of Commerce', labour: 'Secretary of Labor', health: 'Secretary of Health & Human Services', education: 'Secretary of Education', infra: 'Secretary of Transportation', housing: 'Secretary of Housing & Urban Development', energy: 'Secretary of Energy', interior: 'Secretary of Homeland Security', defense: 'Secretary of Defense', foreign: 'Secretary of State' },
   uk: { finance: 'Chancellor of the Exchequer', economy: 'Business & Trade Secretary', labour: 'Work & Pensions Secretary', health: 'Health Secretary', education: 'Education Secretary', infra: 'Transport Secretary', housing: 'Housing Secretary', energy: 'Energy Secretary', interior: 'Home Secretary', defense: 'Defence Secretary', foreign: 'Foreign Secretary' },
   de: { finance: 'Federal Minister of Finance', economy: 'Federal Minister for Economic Affairs', labour: 'Federal Minister of Labour', health: 'Federal Minister of Health', education: 'Federal Minister of Education', infra: 'Federal Minister of Transport', housing: 'Federal Minister for Housing', energy: 'Federal Minister for the Environment', interior: 'Federal Minister of the Interior', defense: 'Federal Minister of Defence', foreign: 'Federal Foreign Minister' },
 };
 const Cabinet = (() => {
   const titleFor = id => (MIN_TITLES[COUNTRY.id] && MIN_TITLES[COUNTRY.id][id]) || MINISTRIES.find(m => m.id === id).title;
+  const mins = () => MINISTRIES.filter(m => !m.only || m.only.includes(COUNTRY.id));
   function ensure() {
-    if (S.cabinet) return;
-    S.cabinet = MINISTRIES.map(m => { const gender = Math.random() < .45 ? 'f' : 'm', look = randomLook(); if (gender === 'f') look.style = pick(['long', 'curly', 'side']); return { id: m.id, name: personName(gender), gender, look, party: S.player.party, skill: Math.round(rnd(60, 92)) }; });
+    if (S.cabinet) { mins().filter(m => !S.cabinet.some(c => c.id === m.id)).forEach(m => { const g = Math.random() < .45 ? 'f' : 'm'; S.cabinet.push({ id: m.id, name: personName(g), gender: g, look: randomLook(), party: S.player.party, skill: 60 }); }); return; }
+    S.cabinet = mins().map(m => { const gender = Math.random() < .45 ? 'f' : 'm', look = randomLook(); if (gender === 'f') look.style = pick(['long', 'curly', 'side']); return { id: m.id, name: personName(gender), gender, look, party: S.player.party, skill: Math.round(rnd(60, 92)) }; });
   }
   function get(id) { ensure(); const m = S.cabinet.find(x => x.id === id); return m ? { ...m, title: titleFor(id), icon: MINISTRIES.find(x => x.id === id).icon } : null; }
   function giveTo(pid) {
@@ -271,7 +280,8 @@ const Cabinet = (() => {
       const st = debt > (S.debtSoft || 80) + 15 || defPct > 5 ? 'red' : defPct > 3 ? 'amber' : 'green';
       const acts = st !== 'green' ? [{ label: 'Raise tax rate +2 pts', fn: () => { B.tax = Math.min(50, B.tax + 2); } }, { label: 'Trim infrastructure upkeep −1', fn: () => { B.infra = Math.max(0, B.infra - 1); } }]
         : defPct < 0 ? [{ label: 'Invest surplus: education +1', fn: () => { B.education = Math.min(10, B.education + 1); } }] : [];
-      out.push({ id: 'finance', st, text: `The budget is projected to run a ${defPct >= 0 ? 'deficit' : 'surplus'} of <b>${fmt(Math.abs(defPct), 1)}% of GDP</b> (${money(Math.abs(bc.bal) * 2)} a year). Public debt is <b>${fmt(debt)}% of GDP</b> and interest payments take <b>${fmt(intShare)}%</b> of tax revenue. ${st === 'red' ? 'Markets will demand higher yields if we do not act. I recommend a credible consolidation plan: a modest tax rise and spending restraint, while protecting health and education.' : st === 'amber' ? 'The deficit is above the 3% of GDP that many fiscal rules use as a ceiling. We should tighten gradually.' : 'Public finances are sound. We have room for growth-enhancing investment.'}`,
+      if (Money.peg() && Money.cover() < 2.5) { acts.unshift({ label: 'Review dollar reserves & financing 🏦', fn: () => ({ tab: 'money' }) }); }
+      out.push({ id: 'finance', st: Money.peg() && Money.cover() < 1.5 ? 'red' : st, text: `The budget is projected to run a ${defPct >= 0 ? 'deficit' : 'surplus'} of <b>${fmt(Math.abs(defPct), 1)}% of GDP</b> (${money(Math.abs(bc.bal) * 2)} a year). Public debt is <b>${fmt(debt)}% of GDP</b> and interest payments take <b>${fmt(intShare)}%</b> of tax revenue. ${st === 'red' ? 'Markets will demand higher yields if we do not act. I recommend a credible consolidation plan: a modest tax rise and spending restraint, while protecting health and education.' : st === 'amber' ? 'The deficit is above the 3% of GDP that many fiscal rules use as a ceiling. We should tighten gradually.' : 'Public finances are sound. We have room for growth-enhancing investment.'}${Money.brief()}`,
         learn: 'A deficit adds to debt every year. Many fiscal rules (for example the EU\'s) cap deficits at 3% of GDP and debt at 60%. What matters most is whether debt is stable relative to GDP — growth helps, high interest rates hurt.', acts });
     }
     // ECONOMY
@@ -355,6 +365,14 @@ const Cabinet = (() => {
       out.push({ id: 'defense', st, text: `Our defence strength is <b>${fmt(s)}</b> against an estimated threat of <b>${fmt(S.threat)}</b>. ${st === 'green' ? 'Deterrence is credible.' : 'We are falling behind. Modern equipment ages quickly — regular investment is cheaper than catching up.'}`,
         learn: 'NATO members aim to spend at least 2% of GDP on defence. Deterrence works when potential aggressors believe an attack would fail or cost too much.', acts });
     }
+    // TOURISM (Maldives)
+    if (COUNTRY.id === 'mv') {
+      const fin = Money.ensure(), e = S.stats.economy, env = S.stats.environment, st = e < 45 || env < 40 ? 'amber' : 'green';
+      const acts = [{ label: 'Review tourism taxes (T-GST, Green Tax) 🏦', fn: () => ({ tab: 'money' }) }];
+      const t = tenderAct('airport', 'Tender a regional airport'); if (t) acts.push(t);
+      out.push({ id: 'tourism', st, text: `Tourism earns most of our dollars. Resorts charge <b>${fin.tgst}% T-GST</b> and a <b>$${fin.green}</b> nightly Green Tax. ${env < 45 ? 'Reef damage and beach erosion are starting to put visitors off — protecting the environment protects tourism.' : 'Arrivals are strong; guesthouse tourism on local islands is spreading the income to the atolls.'} More flights to regional airports bring tourists — and dollars — to the outer atolls.`,
+        learn: 'Tourism is the largest industry in the Maldives and its main source of foreign currency. Taxes paid in dollars (T-GST, Green Tax, land rent, airport fees) help the MMA keep the rufiyaa peg.', acts });
+    }
     // FOREIGN
     {
       const st = S.threat > milStrength() ? 'amber' : 'green';
@@ -395,9 +413,10 @@ const Cabinet = (() => {
           m.querySelectorAll('[data-b]').forEach(btn => btn.onclick = () => {
             const b = list.find(x => x.id === btn.dataset.b), a = b.acts[+btn.dataset.j];
             const r = a.fn(); done.push(b.id);
+            (S.agenda = S.agenda || []).push({ turn: S.turn, min: b.id, label: a.label.replace(/\s*\(.*\)$/, ''), law: r && r.law, tender: r && r.tender, base: r && r.tender ? count(r.tender) : undefined });
             news(`Cabinet adopts ${get(b.id).title.toLowerCase()}'s proposal: ${a.label.replace(/\(.*\)/, '').trim()}`);
             toast(`Adopted: ${a.label}`, 'good'); save();
-            if (r && (r.law || r.tender)) { follow = r; closeModal(); res(); return; }
+            if (r && (r.law || r.tender || r.tab)) { follow = r; closeModal(); res(); return; }
             draw();
           });
           $('#cab-x', m).onclick = () => { closeModal(); res(); };
@@ -406,6 +425,7 @@ const Cabinet = (() => {
       });
       render();
       UI.busy = false;
+      if (follow && follow.tab) { UI.tab = follow.tab; render(); }
       if (follow && follow.law) { UI.tab = 'laws'; render(); await Legis.run(follow.law); }
       if (follow && follow.tender) await Procure.run(follow.tender);
     } finally { UI.busy = false; }
