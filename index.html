@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>President: Rise to Power</title>
+  <meta name="description" content="Run a presidential campaign, win the election and govern your country through crises, scandals and booms.">
+  <meta name="theme-color" content="#0b1220">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="topbar">
+    <button class="logo" data-act="home" aria-label="Title screen">🏛️ <span>PRESIDENT</span></button>
+    <div id="topstats"></div>
+    <button class="menu-btn" data-act="menu" aria-label="Menu">☰</button>
+  </header>
+
+  <main id="app"></main>
+
+  <div id="ticker"><span class="tag">NEWS</span><div class="track"><div id="tickerText"></div></div></div>
+  <div id="modal" role="dialog" aria-modal="true"></div>
+  <div id="toasts" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
