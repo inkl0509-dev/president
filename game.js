@@ -180,7 +180,7 @@ function fxChips(fx, mode) {
 function choiceModal({ icon, title, text, choices, mode }) {
   return new Promise(res => {
     const m = modal(`<div class="m-icon">${icon}</div><h2>${title}</h2><p class="m-body">${text}</p>
-      <div class="choices">${choices.map((c, i) => `<button class="choice" data-i="${i}" ${c.disabled ? 'disabled' : ''}><b>${c.t}</b><span class="fx">${c.note || fxChips(c.fx, mode)}</span></button>`).join('')}</div>`);
+      <div class="choices">${choices.map((c, i) => `<button class="choice" data-i="${i}" ${c.disabled ? 'disabled' : ''}><b>${c.t}</b><span class="fx">${c.note !== undefined ? c.note : fxChips(c.fx || {}, mode)}</span></button>`).join('')}</div>`);
     m.querySelectorAll('.choice').forEach(b => b.onclick = () => { closeModal(); res(+b.dataset.i); });
   });
 }
@@ -461,7 +461,7 @@ async function inviteCoalition(pid) {
   S.pc -= 3;
   const p = partyById(pid);
   if (Math.random() * 100 < S.parl.rel[pid] + 10) {
-    S.parl.coalition.push(pid); S.parl.rel[pid] = clamp(S.parl.rel[pid] + 10);
+    S.parl.coalition.push(pid); S.parl.rel[pid] = clamp(S.parl.rel[pid] + 10); Cabinet.giveTo(pid);
     news(`${p.name} joins the government coalition`); toast(`${p.name} joined your coalition!`, 'good'); say('Together we have a majority!');
   } else {
     S.parl.rel[pid] = clamp(S.parl.rel[pid] - 5);
@@ -491,6 +491,7 @@ async function afterElection() {
     const milUp = (S.mil.army + S.mil.air + S.mil.navy) * .012;
     S.budget = { tax: Math.round(clamp(2 * (12.5 + milUp + S.debt * S.rate) - 1, 10, 48)), health: 5, education: 5, security: 5, infra: 5, welfare: 5 };
     initGovExtras();
+    World.init(); Cabinet.ensure();
     S.hist = [approval()];
   } else {
     S.term++; S.turn = (S.term - 1) * TT() + 1; S.pc += 2;
@@ -547,48 +548,21 @@ function buildBlock(type, rid) {
   if (S.projects.length >= MAX_PROJECTS) return `Max ${MAX_PROJECTS} projects at once`;
   return '';
 }
-async function startTender(type) {
-  const rid = UI.region, r = reg(rid), P = PROJECTS[type];
-  if (UI.busy || S.pendingEvent || buildBlock(type, rid)) return;
-  const spec = shuffle(COMPANIES.filter(c => c.spec !== 'all' && c.spec.includes(type)));
-  const gen = shuffle(COMPANIES.filter(c => c.spec === 'all'));
-  const bidders = [...spec.slice(0, 1), ...gen].slice(0, 3);
-  const bids = bidders.map(c => {
-    const q = clamp(c.quality + (S.companies[c.id] - 50) * .3 + rnd(-5, 5));
-    const price = Math.round(P.cost * c.price * rnd(.92, 1.08) * (c.spec === 'all' ? 1.05 : .95) * 10) / 10;
-    const turns = Math.max(1, P.turns + (c.speed >= 70 ? -1 : c.speed < 50 ? 1 : 0));
-    return { c, q, price, turns };
-  });
-  const choices = bids.map(b => ({
-    t: `${b.c.icon} ${b.c.name} <span class="tag-c ${b.c.tag.toLowerCase()}">${b.c.tag}</span>`,
-    note: `<span class="bid"><b>${money(b.price)}</b> · ${b.turns} half-year${b.turns > 1 ? 's' : ''} · <span class="stars">${stars(b.q)}</span> · reputation ${fmt(S.companies[b.c.id])}</span>`
-      + (b.c.shady ? '<span class="warnline">💰 Offers you a private “thank-you gift” (+⭐2). Risk of scandal!</span>' : '')
-      + (b.c.tag === 'Foreign' ? '<span class="muted"> Business ▲ · Workers ▼ (jobs go abroad)</span>' : '')
-      + (b.c.tag === 'State' ? '<span class="muted"> Workers ▲ (public jobs), often slow</span>' : ''),
-  }));
-  choices.push({ t: 'Cancel tender', note: 'No contract this time' });
-  const k = await choiceModal({ icon: P.icon, title: `Tender: ${P.name} in ${r.name}`, text: `${P.desc}. Three companies have bid. Cheaper isn't always better — low quality means delays, cost overruns and defects.`, choices });
-  if (k >= bids.length) return;
-  const b = bids[k];
-  S.debt += b.price;
-  S.projects.push({ uid: Date.now() + Math.random(), type, region: rid, company: b.c.id, turnsLeft: b.turns, total: b.turns, q: b.q, price: b.price, delays: 0 });
-  if (b.c.shady) { S.pc += 2; S.scandalRisk += 1; }
-  if (b.c.tag === 'Foreign') { S.eventMods.business += 1; S.eventMods.workers -= 1.5; }
-  if (b.c.tag === 'State') S.eventMods.workers += 1;
-  news(`${b.c.name} wins ${money(b.price)} contract for ${P.name} in ${r.name}`);
-  say(`Construction of the ${P.name.toLowerCase()} in ${r.short} begins!`);
-  toast(`Contract awarded to ${b.c.name}`, 'good');
-  save(); render(); City.visit('site'); scrollToCity();
-}
+function startTender(type) { return Procure.run(type); }
 function progressProjects() {
   const msgs = [];
   S.projects.forEach(p => {
     const P = PROJECTS[p.type], c = comp(p.company), r = reg(p.region);
+    if (p.paid === undefined) p.paid = 1;   // old saves were paid up front
     if (Math.random() < (100 - p.q) / 260) {
       p.delays++; S.companies[c.id] = clamp(S.companies[c.id] - 4);
-      msgs.push(`🚧 ${P.name} in ${r.short} delayed by ${c.name}`);
+      const ld = Math.round(p.price * .02 * 100) / 100; S.debt -= ld;
+      msgs.push(`🚧 ${P.name} in ${r.short} delayed by ${c.name} — liquidated damages of ${money(ld)} deducted`);
       if (Math.random() < (100 - p.q) / 300) { const extra = Math.round(p.price * 2) / 10; S.debt += extra; p.price += extra; msgs.push(`💸 Cost overrun on ${P.name}: +${money(extra)}`); }
-    } else p.turnsLeft--;
+    } else {
+      p.turnsLeft--;
+      if (p.paid < 1) { const part = Math.min(1 - p.paid, .85 / p.total); S.debt += p.price * part; p.paid += part; }
+    }
     if (p.turnsLeft <= 0) {
       p.done = true; S.buildings[p.region].push(p.type); S.built++;
       if (P.fx.s) for (const k in P.fx.s) S.lawStat[k] += P.fx.s[k];
@@ -698,6 +672,7 @@ function groupTarget(g) {
     case 'elderly': t += .1 * d('economy') + .45 * d('health') + .3 * d('security') + (b.welfare - 5) * 1.5; break;
   }
   t -= Math.max(0, S.threat - milStrength()) * .15; // fear of war
+  if (g === 'workers' || g === 'elderly') t -= Math.max(0, (S.infl || 3) - (S.inflTarget || 3) - 2) * .5; // cost of living
   return clamp(t + S.lawMods[g] + S.eventMods[g] - S.served * .6 * 8 / TT()); // voter fatigue
 }
 function simulateTurn() {
@@ -719,7 +694,7 @@ function simulateTurn() {
     housing: 40 - S.served * 8 / TT() + ls.housing,
   };
   SK.forEach(k => st[k] = clamp(st[k] + (clamp(T[k]) - st[k]) * .3 + rnd(-1.5, 1.5)));
-  const growth = (st.economy - 45) / 25 + rnd(-.4, .4);
+  const growth = (st.economy - 45) / 25 + rnd(-.4, .4) - Math.max(0, (S.infl || 0) - (S.inflTarget || 3) - 4) * .04;
   S.gdp *= 1 + growth / 100;
   S.pop *= 1 + (.25 + (st.health - 50) * .01 + (st.housing - 50) * .01) / 100;
   const bc = budgetCalc();
@@ -783,17 +758,10 @@ async function endTurn() {
     say(a1 >= a0 ? 'Good news this half-year.' : 'Tough months. We must do better.');
     S.diploThisTurn = false;
     render();
-    const risk = warRisk();
-    await infoModal('📊', `${turnLabel()} report`, `
-      <div class="report">
-        <div><span>Economic growth</span><b class="${r.growth >= 0 ? 'up' : 'down'}">${sign(r.growth)}%</b></div>
-        <div><span>Budget balance</span><b class="${r.bal >= 0 ? 'up' : 'down'}">${r.bal >= 0 ? '+' : '−'}${money(Math.abs(r.bal))}</b></div>
-        <div><span>Approval</span><b class="${a1 >= a0 ? 'up' : 'down'}">${fmt(a0)}% → ${fmt(a1)}%</b></div>
-        <div><span>War risk</span><b class="${risk[1]}">${risk[0]}</b></div>
-      </div>
-      ${r.msgs.length ? `<div class="msgs">${r.msgs.map(m => `<div>${m}</div>`).join('')}</div>` : ''}
-      <div class="statchanges">${SK.map(k => { const d = S.stats[k] - S.statsPrev[k]; return `<span class="chip ${d >= 0 ? 'up' : 'down'}">${STATS[k].icon} ${sign(d, 0)}</span>`; }).join('')}</div>
-      <p class="advisor">${advisorTip()}</p>`);
+    const w = World.step(r);
+    if (w.ev) S.lastWorld = w.ev.head;
+    render();
+    await Paper.show(r, a0, approval(), w);
     if (S.scandalRisk > 0 && Math.random() < .12 * S.scandalRisk) {
       S.scandalRisk = 0; GK.forEach(g => { S.ga[g] = clamp(S.ga[g] - 6); S.eventMods[g] -= 3; }); S.pc = Math.max(0, S.pc - 2);
       news(`BRIBERY SCANDAL: secret gifts to the ${ROLE.title.toLowerCase()} exposed`);
@@ -821,31 +789,20 @@ async function impeachment(ap) {
   if (!passed) { news(`${S.player.name} survives impeachment vote`); GK.forEach(g => S.ga[g] = clamp(S.ga[g] + 2)); }
   return passed;
 }
-async function proposeLaw(id) {
-  const L = LAWS.find(l => l.id === id);
-  if (UI.busy || S.laws.includes(id) || S.lawThisTurn || S.pc < L.pc || S.pendingEvent) return;
-  UI.busy = true;
-  try {
-    S.pc -= L.pc; S.lawThisTurn = true;
-    const seats = castVotes(pid => voteProb(L, pid));
-    const ok = await voteModal(`${COUNTRY.parl || 'Parliament'} votes: ${L.name}`, seats, majority(), 'LAW PASSED ✓', 'Bill rejected ✗');
-    PARTIES.forEach(p => { if (p.id !== S.player.party) S.parl.rel[p.id] = clamp(S.parl.rel[p.id] + lean(L, p.id) * 8); });
-    if (ok) {
-      S.laws.push(id);
-      for (const g in L.g) { S.lawMods[g] += L.g[g]; S.ga[g] = clamp(S.ga[g] + L.g[g] * .5); }
-      for (const k in L.s) { S.lawStat[k] += L.s[k]; S.stats[k] = clamp(S.stats[k] + L.s[k] * .3); }
-      S.lawCost += L.cost;
-      news(`Parliament passes the ${L.name}`); Confetti.burst(90);
-      S.parl.coalition.filter(pid => pid !== S.player.party && lean(L, pid) < -.3).forEach(pid => {
-        S.parl.coalition = S.parl.coalition.filter(x => x !== pid);
-        news(`${partyById(pid).name} quits coalition in protest over ${L.name}`); toast(`${partyById(pid).name} left your coalition!`, 'bad');
-      });
-      const pg = GK.find(g => PROMISES[g].law === id && S.promises.some(p => p.g === g));
-      if (pg) { S.ga[pg] = clamp(S.ga[pg] + 5); S.eventMods[pg] += 4; toast(`Promise kept! ${GROUPS[pg].name} are delighted.`, 'good'); say('A promise made is a promise kept!'); }
-      else say(`The ${L.name} is now law!`);
-    } else { news(`${L.name} defeated in parliament`); say('We\'ll try again next time.'); }
-    save(); render();
-  } finally { UI.busy = false; }
+function proposeLaw(id) { return Legis.run(id); }
+function applyLawPassed(L, k = 1) {
+  S.laws.push(L.id);
+  for (const g in L.g) { S.lawMods[g] += L.g[g] * k; S.ga[g] = clamp(S.ga[g] + L.g[g] * .5 * k); }
+  for (const st in L.s) { S.lawStat[st] += L.s[st] * k; S.stats[st] = clamp(S.stats[st] + L.s[st] * .3 * k); }
+  S.lawCost += L.cost * k;
+  news(`${(LEGAL[L.id] ? LEGAL[L.id].title.replace(' Bill', ' Act') : L.name)} becomes law${k < 1 ? ' (as amended)' : ''}`); Confetti.burst(90);
+  S.parl.coalition.filter(pid => pid !== S.player.party && lean(L, pid) < -.3).forEach(pid => {
+    S.parl.coalition = S.parl.coalition.filter(x => x !== pid);
+    news(`${partyById(pid).name} quits coalition in protest over ${L.name}`); toast(`${partyById(pid).name} left your coalition!`, 'bad');
+  });
+  const pg = GK.find(g => PROMISES[g].law === L.id && S.promises.some(p => p.g === g));
+  if (pg) { S.ga[pg] = clamp(S.ga[pg] + 5); S.eventMods[pg] += 4; toast(`Promise kept! ${GROUPS[pg].name} are delighted.`, 'good'); say('A promise made is a promise kept!'); }
+  else say(`The ${L.name} is now law!`);
 }
 function speech(g) {
   if (S.pc < 1 || S.pendingEvent) return;
@@ -922,7 +879,7 @@ function renderTop() {
     t.innerHTML = chip('🗓️', `Week ${c.week}/${c.weeks}`) + chip('💵', `$${Math.round(c.funds)}M`) + chip('⚡', `${c.ap} actions`);
   } else if (S.ga && S.phase === 'govern') {
     const a = approval();
-    t.innerHTML = chip('🗓️', turnLabel()) + chip('👍', fmt(a) + '%', a < 35 ? 'bad' : a > 55 ? 'good' : '') + chip('🏦', bigMoney(gdpReal())) + chip('📉', `Debt ${fmt(debtPct())}%`, debtPct() > 100 ? 'bad' : '') + chip('⭐', `${S.pc} PC`);
+    t.innerHTML = chip('🗓️', turnLabel()) + chip('👍', fmt(a) + '%', a < 35 ? 'bad' : a > 55 ? 'good' : '') + chip('🏦', bigMoney(gdpReal())) + chip('📉', `Debt ${fmt(debtPct())}%`, debtPct() > 100 ? 'bad' : '') + chip('💹', `Infl ${fmt(S.infl || 0, 1)}%`, (S.infl || 0) > (S.inflTarget || 3) + 3 ? 'bad' : '') + chip('⭐', `${S.pc} PC`);
   } else t.innerHTML = '';
 }
 function renderTicker() {
@@ -1206,7 +1163,7 @@ function lawsHTML() {
     const fx = { g: L.g, s: L.s, cost: L.cost };
     return `<div class="law ${passed ? 'passed' : ''}"><div class="lh"><span class="li">${L.icon}</span><div><b>${L.name}</b>${promisedLaws.includes(L.id) && !passed ? '<span class="tag-p">🤝 promised</span>' : ''}<small>${L.desc}</small></div></div>
       <div class="fx">${fxChips(fx, 'gov')}</div>
-      <div class="lf">${passed ? '<span class="good">✓ In force</span>' : `<span class="small ${ey >= majority() * 1.08 ? 'good' : ey >= majority() * .94 ? 'warn' : 'bad'}">⭐${L.pc} · expected ~${ey} votes</span><button class="btn small ${can ? 'primary' : ''}" data-act="law" data-id="${L.id}" ${can ? '' : 'disabled'}>Propose</button>`}</div></div>`;
+      <div class="lf">${passed ? '<span class="good">✓ In force</span>' : `<span class="small ${ey >= majority() * 1.08 ? 'good' : ey >= majority() * .94 ? 'warn' : 'bad'}">⭐${L.pc} · expected ~${ey} votes</span><button class="btn small ${can ? 'primary' : ''}" data-act="law" data-id="${L.id}" ${can ? '' : 'disabled'}>Draft bill</button>`}</div></div>`;
   }).join('')}</div>`;
 }
 function hemicycle() {
@@ -1271,9 +1228,10 @@ function cityBar(camp) {
   }
   return `<div class="cv-bar">
     <div class="cvb-info"><b>⭐ ${S.pc} PC</b><small class="muted">${turnLabel()}</small></div>
-    <button class="cvb" data-act="buildPick" ${S.pendingEvent ? 'disabled' : ''}><span>🏗️</span>Build in ${reg(UI.region).short}<small>open tender</small></button>
+    <button class="cvb" data-act="cabinet" ${S.pendingEvent ? 'disabled' : ''}><span>👔</span>Cabinet meeting<small>${S.cabinetDone && S.cabinetDone.turn === S.turn ? 'held' : 'briefings'}</small></button>
+    <button class="cvb" data-act="buildPick" ${S.pendingEvent ? 'disabled' : ''}><span>🏗️</span>Build in ${reg(UI.region).short}<small>public tender</small></button>
+    <button class="cvb" data-act="tab" data-id="laws" data-scroll="1"><span>📜</span>Draft a bill<small>⭐ ${S.pc}</small></button>
     <button class="cvb" data-act="speechPick" ${S.pc < 1 || S.pendingEvent ? 'disabled' : ''}><span>🎤</span>Give a speech<small>⭐1</small></button>
-    <button class="cvb" data-act="tab" data-id="housing" data-scroll="1"><span>🏘️</span>Housing<small>${S.housing.price}</small></button>
     <button class="cvb" data-act="tab" data-id="parl" data-scroll="1"><span>🏛️</span>Parliament<small>${coalitionSeats()}/${S.parl.size || 100}</small></button>
     <button class="cvb" data-act="tab" data-id="defense" data-scroll="1"><span>🛡️</span>Defense<small>risk ${warRisk()[0].toLowerCase()}</small></button>
     <button class="btn primary cvb-end" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish →' : 'End term →') : 'End half-year →'}</button></div>`;
@@ -1415,6 +1373,7 @@ const ACT = {
   afterElection: () => afterElection(),
   tab: d => { UI.tab = d.id; render(); if (d.scroll) { const t = $('.tabs'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
   buildPick: () => buildPick(),
+  cabinet: () => Cabinet.meeting(),
   speechPick: () => speechPick(),
   law: d => proposeLaw(d.id),
   speech: d => speech(d.g),
@@ -1447,6 +1406,7 @@ function resume() {
   UI.walkFrom = null; UI.speech = 'Welcome back!';
   applyCountry(S.countryId || 'veloria');
   if (!S.scale) S.scale = 1; if (!S.termTurns) S.termTurns = 8; if (!S.maxTerms) S.maxTerms = 2;
+  if (S.stats && S.infl === undefined) World.init();
   if (S.stats) initGovExtras();
   if (!S.buildings) S.buildings = JSON.parse(JSON.stringify(START_BUILDINGS));
   if (S.phase === 'campaign') UI.screen = 'campaign';

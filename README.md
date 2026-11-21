@@ -6,6 +6,31 @@ crises and keeping your promises. Your choices decide your legacy.
 
 Pure **HTML + CSS + JavaScript** — no build step, no frameworks. Optional **Firebase** online Hall of Fame.
 
+## How government works in the game
+
+- **Passing a law** follows the real legislative path: a formal **bill** (long title, numbered sections,
+  explanatory memorandum with the cost to taxpayers) → **first reading** → **committee stage** (members in
+  proportion to party seats, expert witnesses for and against, a proposed amendment you can accept or reject) →
+  **second reading debate** (MPs from each party speak; you can whip and negotiate) → **division** (the vote) →
+  **upper house** (Senate, House of Lords, Bundesrat, Rajya Sabha…) → **enactment** (signature, Royal Assent or
+  promulgation, depending on the country).
+- **Awarding a project** follows public-procurement practice: choose **open tender, restricted tender or direct
+  contracting** → official **invitation for bids** with published criteria → **public bid opening** →
+  **evaluation committee** (chair, engineer, financial analyst, compliance officer, independent observer) scoring
+  Price 40 / Technical 30 / Experience 15 / Time 15 with integrity checks → **award** (or a risky override) →
+  possible **bid protest** to a review board → **contract** with advance payment, performance guarantee,
+  liquidated damages for delay and retention. Contractors are paid by milestones as work progresses.
+- **Cabinet meetings**: 11 ministers (with each country's real titles, e.g. Chancellor of the Exchequer, Secretary
+  of State) brief you with live data, explain the economics behind it, and propose actions you can adopt.
+  Coalition partners get a ministry.
+- **The newspaper** each half-year: headline story, economy figures, a markets box (stock index, currency,
+  inflation, central-bank rate, bond yield, oil), world news with its effect on your country, an
+  "economics explained" box, opinion poll and editorial.
+- **World economy**: inflation (starting from each country's recent real rate), an independent central bank,
+  and 15 kinds of world events — oil and gas price swings, global rate hikes, gold prices, remittances, trade
+  wars, shipping disruptions, AI boom… — whose effects depend on what your country exports and imports.
+  The first edition reflects the real late-2026 situation: energy-driven inflation and central-bank rate rises.
+
 ## Real countries
 
 Pick a fictional country or one of 10 real ones: Uzbekistan, Kazakhstan, Türkiye, United States, United Kingdom,
@@ -73,6 +98,7 @@ data.js           game content: parties, regions, cities, projects, companies, l
 game.js           game logic + UI
 city.js           animated city view + campaign scenes (canvas)
 stage.js          animated TV debate studio + confetti
+gov.js            bills, procurement, cabinet, newspaper, world economy
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured
 firestore.rules   security rules for the leaderboard
