@@ -274,6 +274,18 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
 .neighbor { fill: #64748b; font-size: 8px; font-weight: 600; letter-spacing: .05em; }
 .plane { pointer-events: none; }
 
+/* city view */
+.citycard { margin-bottom: 1rem; padding: .8rem; }
+.cv-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: .6rem; }
+.cv-title { display: flex; flex-direction: column; } .cv-title b { font-size: 1.15rem; }
+.moods { display: flex; flex-wrap: wrap; gap: .1rem; flex: 1; }
+.citycard .rpick { margin: 0; flex: 0 1 380px; }
+.cv-wrap { position: relative; }
+#city { width: 100%; height: 280px; display: block; border-radius: 12px; cursor: grab; touch-action: pan-y; background: #87c3f0; }
+#city.grabbing { cursor: grabbing; }
+#cv-tip { position: absolute; display: none; pointer-events: none; background: rgba(15,23,42,.94); border: 1px solid var(--line); border-radius: 10px; padding: .45rem .65rem; font-size: .78rem; line-height: 1.4; max-width: 190px; z-index: 2; }
+.cv-hint { position: absolute; right: 10px; bottom: 8px; font-size: .7rem; color: #e2e8f0; background: rgba(15,23,42,.6); padding: .15rem .5rem; border-radius: 99px; pointer-events: none; }
+
 /* game over & hall */
 .over, .hall { max-width: 640px; margin: 0 auto; text-align: center; }
 .over .avatar { display: block; margin: .5rem auto; }
@@ -303,6 +315,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
   .grid3.gov > .leader { grid-column: auto; }
 }
 @media (max-width: 720px) {
+  #city { height: 220px; }
   .overview { grid-template-columns: repeat(2, 1fr); }
   main { padding: .6rem; }
   .grid3, .grid3.gov, .grid2, .setup-grid { grid-template-columns: 1fr; }

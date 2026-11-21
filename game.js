@@ -506,7 +506,7 @@ async function startTender(type) {
   news(`${b.c.name} wins ${money(b.price)} contract for ${P.name} in ${r.name}`);
   say(`Construction of the ${P.name.toLowerCase()} in ${r.short} begins!`);
   toast(`Contract awarded to ${b.c.name}`, 'good');
-  save(); render();
+  save(); render(); City.visit('site');
 }
 function progressProjects() {
   const msgs = [];
@@ -920,6 +920,7 @@ function mapSVG(mode) {
     ${oppMark}${walker}</svg>`;
 }
 function postRender() {
+  if (typeof City !== 'undefined') City.attach($('#city'));
   const w = $('#walker');
   if (w && UI.walkTo) {
     const t = UI.walkTo;
@@ -1174,11 +1175,20 @@ function peopleHTML() {
   <h3>Regions</h3>${REGIONS.map(r => { const a = regionApproval(r); return `<div class="stat"><span>${r.name}</span><div class="bar"><div style="width:${a}%;background:${approvalColor(a)}"></div></div><b>${fmt(a)}%</b><em></em></div>`; }).join('')}
   <h3>Approval</h3>${chartSVG()}`;
 }
+function cityCard() {
+  const r = reg(UI.region), ra = regionApproval(r);
+  const moodChip = g => { const v = clamp(S.ga[g] + S.regionMods[r.id] * .5); return `<span class="chip" title="${GROUPS[g].name}">${GROUPS[g].icon} ${v >= 60 ? '😊' : v < 40 ? '😠' : '😐'} ${fmt(v)}%</span>`; };
+  return `<div class="card citycard">
+    <div class="cv-head"><div class="cv-title"><b>🏙️ ${r.city[2]}</b><span class="muted small">${r.name} · ${fmt(r.pop * S.pop / 100, 1)}M people · mood ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span></div>
+      <div class="moods">${GK.filter(g => r.mix[g] > 0).map(moodChip).join('')}</div>${regionPicker()}</div>
+    <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">drag to explore · hover people &amp; buildings</div></div>
+  </div>`;
+}
 const TABS = [['budget', '💰 Budget'], ['build', '🏗️ Build'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];
 function renderGovern() {
   const ap = approval(), pp = partyById(S.player.party), inTerm = (S.turn - 1) % 8 + 1;
   const tabHTML = { budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
-  return `<div class="grid3 gov">
+  return `${cityCard()}<div class="grid3 gov">
     <div class="card leader">
       <div class="portrait">${bubble()}${avatarSVG(S.player.look, mood(), 110, 'float')}</div>
       <h2>${esc(S.player.name)}</h2><div class="muted">President of ${esc(S.country)}</div>

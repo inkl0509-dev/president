@@ -15,6 +15,12 @@ Pure **HTML + CSS + JavaScript** — no build step, no frameworks. Optional **Fi
 - Promises give a big boost — but you must pass the matching law once in office.
 
 **Governing (2 terms × 8 half-years)**
+- **City view**: an animated street scene of the selected region. Every building you own is drawn — homes, shops,
+  hospitals, schools with kids playing, smoking factories, wind turbines, airports with planes taking off, ports with
+  ships and cranes, military bases with tanks, parks and stadiums, construction sites with cranes and builders.
+  Citizens walk around, go to work and say what they think; the face above each person shows if they are happy 😊,
+  okay 😐 or angry 😠. Very unhappy groups protest with signs. Your president walks around inspecting it all.
+  Drag to explore, hover to inspect.
 - **Map**: 5 regions with cities, roads, and every building you own. Tap a region — your president walks there to inspect it.
 - **Build**: start projects (housing estates, hospitals, schools, highways, airports, seaports, industrial parks,
   solar/wind farms, coal plants, military bases, parks). Each project goes to **tender**: 3 companies bid with
@@ -41,6 +47,7 @@ index.html        page shell
 style.css         all styles
 data.js           game content: parties, regions, cities, projects, companies, laws, events
 game.js           game logic + UI
+city.js           animated city view (canvas)
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured
 firestore.rules   security rules for the leaderboard
