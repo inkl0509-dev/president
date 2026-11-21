@@ -33,8 +33,9 @@ Pure **HTML + CSS + JavaScript** — no build step, no frameworks. Optional **Fi
 
 ## Real countries
 
-Pick a fictional country or one of 10 real ones: Uzbekistan, Kazakhstan, Türkiye, United States, United Kingdom,
-Germany, France, Japan, India and Brazil. Each uses real data:
+Pick a fictional country or one of 11 real ones: Maldives, Uzbekistan, Kazakhstan, Türkiye, United States,
+United Kingdom, Germany, France, Japan, India and Brazil. (Maldives: presidential system, 5-year terms with a
+2-term limit, 93-seat People's Majlis, every region coastal and built around Greater Malé, the atolls and Addu.) Each uses real data:
 
 - **Population, GDP (IMF 2025, nominal US$) and government debt (% of GDP)**. All money in the game is shown at the
   real scale of that economy.
@@ -48,6 +49,20 @@ Germany, France, Japan, India and Brazil. Each uses real data:
   5-region layout, not the true border shape; starting stats (health, education…) are rough game estimates.
 
 Edit `COUNTRIES` in `data.js` to add more countries.
+
+## Office, diplomacy and ceremonies
+
+- **Pinned scene**: the animated panel stays at the top of the screen while you scroll (📌 to unpin).
+- **Presidential office**: while governing, the top panel shows your office: flags, desk, live TV news, aides.
+  Signed laws are shown being signed at the desk.
+- **Speeches**: addresses to a group or to the nation, written in the formal style of a head of state and built
+  from your real record (growth, inflation, projects, laws). They are original texts, not copies of real leaders' speeches.
+- **Cabinet room**: ministers sit around the table and each gives a professional briefing.
+- **Foreign affairs**: speak at the UN General Assembly (second half of the year), attend the summits your country
+  really belongs to (G20, G7, NATO, EU, SCO, BRICS, Commonwealth, COP…) and make state visits to real partner
+  countries. Foreign officials are generic figures shown with their national flag. Trips build international reputation and deals.
+- **Opening ceremonies**: when a project is finished, the city view shows a ribbon-cutting ceremony.
+- Flags are drawn in SVG so they also display on Windows (which has no emoji flags).
 
 ## How to play
 
@@ -99,6 +114,7 @@ game.js           game logic + UI
 city.js           animated city view + campaign scenes (canvas)
 stage.js          animated TV debate studio + confetti
 gov.js            bills, procurement, cabinet, newspaper, world economy
+scenes.js         flags, office, speeches, UN, summits, state visits, cabinet room
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured
 firestore.rules   security rules for the leaderboard

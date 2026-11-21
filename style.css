@@ -393,6 +393,29 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
 .cab-acts { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
 @media (max-width: 720px) { .proc-grid, .cab-list, .p-cols, .board { grid-template-columns: 1fr; } .bidtable { font-size: .72rem; } }
 
+/* pinned animation panel */
+.citycard.pin { position: sticky; top: 54px; z-index: 12; box-shadow: 0 12px 30px rgba(0,0,0,.55); }
+.citycard.pin .cv-head { margin-bottom: .4rem; }
+.pinbtn { background: var(--card2); border: 1px solid var(--line); border-radius: 8px; width: 34px; height: 30px; }
+.cv-banner { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); background: rgba(15,23,42,.92); border: 1px solid var(--gold); color: #fde68a; padding: .45rem .8rem; border-radius: 99px; font-size: .88rem; display: flex; gap: .6rem; align-items: center; white-space: nowrap; animation: pop .3s ease-out; z-index: 3; }
+.flag { display: inline-block; vertical-align: -3px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.country .cflag .flag { vertical-align: 0; }
+/* scene modals */
+.modal-card.scene-card { width: min(1000px, 100%); padding: .8rem; text-align: left; }
+.scene-title { font-weight: 800; font-size: .95rem; color: #fde68a; margin-bottom: .45rem; display: flex; gap: .45rem; align-items: center; }
+.scene-cv { width: 100%; aspect-ratio: 900 / 400; display: block; border-radius: 12px; background: #0b1427; }
+.scene-cv.cab-cv { aspect-ratio: 900 / 260; }
+.speech-text { max-height: 170px; overflow: auto; background: #fbf8f1; color: #1c1917; border-radius: 8px; padding: .7rem 1rem; margin-top: .6rem; font-family: Georgia, serif; font-size: .98rem; line-height: 1.55; }
+.speech-text p { margin: .25rem 0; color: #a8a29e; transition: color .3s; }
+.speech-text p.on { color: #1c1917; background: #fef3c7; border-radius: 4px; padding: 0 .3rem; }
+.speech-text p.done { color: #44403c; }
+@media (max-width: 720px) {
+  .citycard.pin #city { height: 170px; }
+  .citycard.pin .cv-bar { flex-wrap: nowrap; overflow-x: auto; }
+  .citycard.pin .moods { display: none; }
+  .cvb { flex: 0 0 auto; min-width: 92px; }
+}
+
 /* game over & hall */
 .over, .hall { max-width: 640px; margin: 0 auto; text-align: center; }
 .over .avatar { display: block; margin: .5rem auto; }

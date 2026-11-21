@@ -266,7 +266,7 @@ const City = (() => {
     if (prez) { prez.onStage = false; prez.wait = 1.5; prez.target = null; }
   }
   function event(type, data = {}) {
-    if (!cv || !lots.length || !camp()) return;
+    if (!cv || !lots.length || (!camp() && type !== 'ceremony')) return;
     if (ev) endEvent();
     const pc = partyById(S.player.party).color, first = S.player.name.split(' ')[0], last = S.player.name.split(' ').slice(-1)[0], city = reg(region).city[2], oppN = S.opp.name.split(' ')[0];
     const x = Math.max(120, Math.min(worldW - 120, cam + viewW / 2));
@@ -278,9 +278,17 @@ const City = (() => {
       attack: [`${oppN} has no plan!`, `Can you really trust ${oppN}?`],
       fund: ['Thank you for your support!', 'Every dollar counts!', 'Cheers, everyone!'],
       door: ['Hi! Can I count on your vote?', `I'm ${first} — nice to meet you!`],
+      ceremony: data.type ? [`I declare this ${PROJECTS[data.type].name.toLowerCase()} open!`, 'Thank you to every worker who built it!', `This is for the people of ${city}!`] : ['Congratulations!'],
     };
     ev = { type, t0: time, dur: type === 'door' ? 7 : 10, x, data, region, lines: L[type] || ['Hello!'], stage: type === 'rally' || type === 'promise', pc, first, last: last.toUpperCase(), chant: `${first} for ${ROLE.title.toLowerCase()}!` };
-    if (type === 'door') {
+    if (type === 'ceremony') {
+      const L2 = lots.filter(l => l.type === data.type).pop();
+      if (L2) ev.x = L2.x + L2.w / 2;
+      ev.prezX = ev.x; ev.dur = 11; ev.cutAt = time + 3.5;
+      ev.officials = [randomLook(), randomLook()];
+      ev.name = PROJECTS[data.type] ? PROJECTS[data.type].name : '';
+      ev.company = data.company && comp(data.company) ? comp(data.company).name : '';
+    } else if (type === 'door') {
       const homes = lots.filter(l => ['houses', 'apartments', 'chalets', 'housing', 'barn'].includes(l.type));
       const l = homes.sort((a, b) => Math.abs(a.x + a.w / 2 - x) - Math.abs(b.x + b.w / 2 - x))[0] || lots[0];
       ev.doorX = l.x + 24; ev.x = ev.doorX; ev.prezX = ev.doorX - 16; ev.face = 1;
@@ -290,7 +298,7 @@ const City = (() => {
     else ev.prezX = x;
     cam = Math.max(0, Math.min(worldW - viewW, ev.x - viewW / 2)); lastInteract = time + 6;
     if (prez) { if (Math.abs(prez.x - ev.prezX) > viewW * .45) prez.x = ev.prezX + (prez.x < ev.prezX ? -1 : 1) * viewW * .45; prez.bubble = null; prez.lastSay = time - 2.5; }
-    if (['rally', 'promise', 'townhall', 'fund'].includes(type)) {
+    if (['rally', 'promise', 'townhall', 'fund', 'ceremony'].includes(type)) {
       const n = type === 'fund' ? 8 : type === 'townhall' ? 10 : 16;
       people.filter(p => p.kind === 'walker' && p.state !== 'inside').sort((a, b) => Math.abs(a.x - x) - Math.abs(b.x - x)).slice(0, n).forEach((p, i) => {
         const side = i % 2 ? 1 : -1, row = Math.floor(i / 2);
@@ -301,9 +309,10 @@ const City = (() => {
   }
   function spawnEventParts(dt) {
     const e = ev;
-    if (e.stage && Math.random() < dt * 34) parts.push({ x: e.x + rand(-110, 110), y: rand(10, 70), vx: rand(-8, 8), vy: rand(28, 50), r: rand(2, 3.5), life: 0, max: 4.5, conf: choose(['#f43f5e', '#facc15', '#22c55e', '#3b82f6', '#a855f7', '#ffffff', e.pc]), rot: rand(0, 6) });
+    if ((e.stage || (e.type === 'ceremony' && time > e.cutAt)) && Math.random() < dt * 34) parts.push({ x: e.x + rand(-110, 110), y: rand(10, 70), vx: rand(-8, 8), vy: rand(28, 50), r: rand(2, 3.5), life: 0, max: 4.5, conf: choose(['#f43f5e', '#facc15', '#22c55e', '#3b82f6', '#a855f7', '#ffffff', e.pc]), rot: rand(0, 6) });
     if (e.stage && Math.random() < dt * 2.5) parts.push({ x: e.x + rand(-70, 70), y: WALK - 40, vx: rand(-4, 4), vy: rand(-22, -14), r: 10, life: 0, max: 2, txt: choose(['👏', '🙌', '❤️', '🎉']) });
     if (e.type === 'fund' && Math.random() < dt * 4) parts.push({ x: e.x + rand(-70, 70), y: BASE - 34, vx: rand(-4, 4), vy: rand(-24, -14), r: 10, life: 0, max: 2.4, txt: choose(['💵', '💰', '🥂']) });
+    if (e.type === 'ceremony' && time > e.cutAt && Math.random() < dt * 3) parts.push({ x: e.x + rand(-80, 80), y: WALK - 40, vx: rand(-4, 4), vy: rand(-22, -14), r: 10, life: 0, max: 2, txt: choose(['👏', '🎉', '🙌']) });
     if (e.type === 'door' && e.happy && time - e.t0 > 3 && Math.random() < dt * 3) parts.push({ x: e.doorX + rand(-8, 8), y: WALK - 36, vx: rand(-4, 4), vy: rand(-20, -12), r: 10, life: 0, max: 2, txt: '❤️' });
     if (e.type === 'townhall' && Math.random() < dt * .8) parts.push({ x: e.x + rand(-60, 60), y: WALK - 40, vx: 0, vy: -14, r: 10, life: 0, max: 1.6, txt: choose(['✋', '❓', '👍']) });
   }
@@ -371,11 +380,29 @@ const City = (() => {
       for (let i = 0; i < 7; i++) { const bx = e.x - 96 + i * 32, by = BASE - 130 - ((time * 14 + i * 23) % 90); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = .6; line(bx, by + 8, bx + Math.sin(time + i) * 2, by + 22); ctx.fillStyle = i % 2 ? e.pc : '#ffffff'; ctx.beginPath(); ctx.ellipse(bx, by, 5, 6.5, 0, 0, Math.PI * 2); ctx.fill(); }
     }
     if (e.type === 'tv' || e.type === 'attack') billboard(e.x, e.type === 'attack');
+    if (e.type === 'ceremony') {
+      const fl = Flags.img(myFlagCode());
+      [e.x - 90, e.x + 90].forEach((fx, i) => { line(fx, BASE, fx, BASE - 70); ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2; line(fx, BASE, fx, BASE - 70); if (fl.complete) ctx.drawImage(fl, fx + (i ? -36 : 0), BASE - 70, 36, 24); });
+      rr(e.x - 80, BASE - 132, 160, 24, 12, '#b91c1c'); text(`GRAND OPENING · ${e.name.toUpperCase()}`, e.x, BASE - 116, 8.5, '#fff', 800);
+      for (let i = 0; i < 6; i++) { const bx = e.x - 75 + i * 30, by = BASE - 150 - ((time * 12 + i * 17) % 40); ctx.fillStyle = i % 2 ? '#ef4444' : '#fbbf24'; ctx.beginPath(); ctx.ellipse(bx, by, 5, 6.5, 0, 0, Math.PI * 2); ctx.fill(); }
+      R(e.x - 60, BASE - 4, 4, 30, '#fbbf24'); R(e.x + 56, BASE - 4, 4, 30, '#fbbf24');
+    }
     if (e.type === 'fund') gala(e.x);
     if (e.type === 'townhall') townhallSet(e.x);
     if (e.type === 'door') { const open = Math.min(1, (time - e.t0 - 1.5) / .6); if (open > 0) R(e.doorX - 6, BASE - 18, 10 * open, 18, '#1c1917'); }
   }
   function drawEventFront() {
+    if (ev && ev.type === 'ceremony') {
+      const e = ev, cut = time > e.cutAt, ry = WALK - 14;
+      ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 3;
+      if (!cut) line(e.x - 58, ry, e.x + 58, ry);
+      else { const d = Math.min(1, (time - e.cutAt) * 1.5); line(e.x - 58, ry, e.x - 58 + 20, ry + 18 * d); line(e.x + 58, ry, e.x + 58 - 20, ry + 18 * d); }
+      ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.ellipse(e.x, ry, cut ? 0 : 6, 4, 0, 0, Math.PI * 2); ctx.fill();
+      drawCandidate(e.officials[0], 1, e.x - 34, WALK + 1, false, 0, 1, 'MINISTER', 'rgba(148,163,184,.95)');
+      drawCandidate(e.officials[1], 1, e.x + 34, WALK + 1, false, 0, -1, (e.company || 'CONTRACTOR').toUpperCase().slice(0, 18), 'rgba(148,163,184,.95)');
+      if (!cut && prez && Math.abs(prez.x - e.x) < 3) text('✂️', e.x + 8, WALK - 30, 14, '#000');
+      if (cut && time - e.cutAt < 2) text('✂️ SNIP!', e.x, WALK - 60, 12, '#b91c1c', 800);
+    }
     if (oppStage) {
       drawCandidate(S.opp.look, 0, oppStage.x, BASE - 20, false, 0, -1, S.opp.name.split(' ').slice(-1)[0].toUpperCase(), partyById(S.opp.party).color, '#fff');
       if (oppStage.bubble) drawBubble(oppStage.x, BASE - 94, oppStage.bubble.text);

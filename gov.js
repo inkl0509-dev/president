@@ -17,6 +17,7 @@
 // ---------- people ----------
 const NAME_POOLS = {
   uz: { m: ['Aziz', 'Sardor', 'Jasur', 'Bekzod', 'Timur', 'Rustam', 'Farrukh', 'Otabek', 'Sherzod', 'Ulugbek'], f: ['Dilnoza', 'Nodira', 'Malika', 'Gulnora', 'Shahnoza', 'Kamola', 'Feruza', 'Zarina', 'Madina', 'Laylo'], l: ['Rakhimov', 'Tursunov', 'Nazarov', 'Usmonov', 'Ismoilov', 'Saidov', 'Khamidov', 'Ergashev', 'Yuldashev', 'Sobirov'], fem: 'a' },
+  mv: { m: ['Ahmed', 'Mohamed', 'Ibrahim', 'Hassan', 'Ali', 'Hussain', 'Moosa'], f: ['Aishath', 'Fathimath', 'Mariyam', 'Hawwa', 'Aminath', 'Shifa', 'Shaheena'], l: ['Rasheed', 'Naseem', 'Shareef', 'Waheed', 'Manik', 'Saleem', 'Latheef'] },
   kz: { m: ['Askar', 'Nurlan', 'Daulet', 'Yerlan', 'Arman', 'Marat', 'Bauyrzhan'], f: ['Aigerim', 'Dana', 'Gulnar', 'Saule', 'Aliya', 'Zhanna', 'Asel'], l: ['Abenov', 'Omarov', 'Sadykov', 'Zhumabekov', 'Iskakov', 'Bekov', 'Seitov'], fem: 'a' },
   tr: { m: ['Emre', 'Mehmet', 'Burak', 'Can', 'Kerem', 'Murat'], f: ['Elif', 'Zeynep', 'Ayşe', 'Selin', 'Deniz', 'Ebru'], l: ['Yılmaz', 'Kaya', 'Demir', 'Şahin', 'Çelik', 'Aydın', 'Öztürk', 'Arslan'] },
   en: { m: ['James', 'Daniel', 'Michael', 'Robert', 'Thomas', 'David'], f: ['Sarah', 'Emily', 'Laura', 'Rachel', 'Olivia', 'Hannah'], l: ['Carter', 'Bennett', 'Hughes', 'Morgan', 'Fletcher', 'Reed', 'Walsh', 'Porter'] },
@@ -27,7 +28,7 @@ const NAME_POOLS = {
   br: { m: ['Lucas', 'Gabriel', 'Rafael', 'Pedro', 'Thiago', 'Bruno'], f: ['Ana', 'Beatriz', 'Juliana', 'Camila', 'Larissa', 'Fernanda'], l: ['Silva', 'Souza', 'Oliveira', 'Costa', 'Almeida', 'Ferreira', 'Ribeiro', 'Carvalho'] },
   intl: { m: ['Adrian', 'Marco', 'Viktor', 'Samuel', 'Leon', 'Omar'], f: ['Nina', 'Clara', 'Irina', 'Sofia', 'Lea', 'Yasmin'], l: ['Varga', 'Moreno', 'Lindqvist', 'Novak', 'Haddad', 'Petrov', 'Costa', 'Brandt'] },
 };
-const POOL_OF = { uz: 'uz', kz: 'kz', tr: 'tr', us: 'en', uk: 'en', de: 'de', fr: 'fr', jp: 'jp', in: 'in', br: 'br' };
+const POOL_OF = { mv: 'mv', uz: 'uz', kz: 'kz', tr: 'tr', us: 'en', uk: 'en', de: 'de', fr: 'fr', jp: 'jp', in: 'in', br: 'br' };
 function personName(gender) {
   const P = NAME_POOLS[POOL_OF[COUNTRY.id] || 'intl'];
   const first = pick(gender === 'f' ? P.f : P.m); let last = pick(P.l);
@@ -51,6 +52,7 @@ const yearNow = () => 2026 + Math.ceil((S.turn || 1) / 2);
 const ECON = {
   veloria: { tags: ['agri', 'manufacturing'], infl: 3, target: 3, real: 1, cur: 'velor' },
   uz: { tags: ['gold', 'gas', 'agri', 'remittances', 'emerging'], infl: 6.2, target: 5, real: 7.5, cur: 'so\'m', upper: { name: 'Senate', seats: 65 }, assent: 'approved by the Senate, signed by the President and published — it enters into force.' },
+  mv: { tags: ['tourism', 'emerging', 'energyImporter'], infl: 3, target: 3, real: 4, cur: 'rufiyaa', upper: null, assent: 'ratified by the President and published in the Government Gazette.' },
   kz: { tags: ['oil', 'metals', 'emerging'], infl: 10.2, target: 5, real: 6, cur: 'tenge', upper: { name: 'Senate', seats: 50 }, assent: 'approved by the Senate and signed by the President.' },
   tr: { tags: ['tourism', 'manufacturing', 'emerging', 'energyImporter', 'exporter'], infl: 31.7, target: 5, real: 7, cur: 'lira', upper: null, assent: 'approved by the President and published in the Official Gazette.' },
   us: { tags: ['tech', 'oil', 'reserve'], infl: 3.5, target: 2, real: .8, cur: 'dollar', upper: { name: 'Senate', seats: 100 }, assent: 'passed by the Senate and signed into law by the President.' },
@@ -198,7 +200,7 @@ const Paper = (() => {
     const brief = [...r.msgs, ...S.news.slice(0, 4).filter(n => !r.msgs.includes(n))].slice(0, 7);
     return new Promise(res => {
       const m = modal(`<div class="paper">
-        <div class="p-mast"><div class="p-name">${esc(paperName())}</div><div class="p-date">${S.flag || ''} ${esc(S.country)} · ${turnLabel()} · ${yearNow()} edition</div></div>
+        <div class="p-mast"><div class="p-name">${esc(paperName())}</div><div class="p-date">${myFlag()} ${esc(S.country)} · ${turnLabel()} · ${yearNow()} edition</div></div>
         <div class="p-head">${esc(head)}</div><div class="p-sub">${esc(sub)}</div>
         <div class="p-cols">
           <div class="p-main"><p class="p-lead">${lead}</p>${world}
@@ -380,11 +382,16 @@ const Cabinet = (() => {
           const table = `<svg viewBox="0 0 600 150" class="cab-table"><ellipse cx="300" cy="104" rx="236" ry="40" fill="#5b3a1e"/><ellipse cx="300" cy="100" rx="228" ry="35" fill="#7c4a24"/>
             ${seats.map(s2 => `<g transform="translate(${s2.x - 14},${s2.y - 20}) scale(.24)">${avatarInner(s2.c.look, 0)}</g>`).join('')}
             <g transform="translate(286,110) scale(.26)">${avatarInner(S.player.look, 1)}</g><text x="300" y="148" class="cab-you">You</text></svg>`;
-          const m = modal(`<div class="m-icon">🏛️</div><h2>Cabinet meeting</h2><p class="m-body">${turnLabel()} · ${S.cabinet.length} ministers present. Most urgent briefings first. Each minister's advice can be adopted once per half-year.</p>${table}
+          const m = modal(`<div class="scene-title">🏛️ Cabinet meeting · ${turnLabel()}</div><canvas id="cab-cv" class="scene-cv cab-cv"></canvas><p class="m-body small">${S.cabinet.length} ministers present. Most urgent briefings first — hover a card to hear that minister. Each minister's advice can be adopted once per half-year.</p>
             <div class="cab-list">${list.map(b => { const mi = get(b.id); return `<div class="cab ${b.st}"><div class="cab-h">${avatarSVG(mi.look, b.st === 'red' ? -1 : b.st === 'green' ? 1 : 0, 46)}<div><b>${mi.icon} ${esc(mi.name)}</b><small>${esc(mi.title)}${mi.party !== S.player.party ? ` · <span style="color:${partyById(mi.party).color}">${partyById(mi.party).name}</span>` : ''}</small></div><span class="dot ${b.st}"></span></div>
               <p>${b.text}</p><details><summary>📘 Why it matters</summary><p>${b.learn}</p></details>
               <div class="cab-acts">${done.includes(b.id) ? '<span class="good small">✓ Advice adopted</span>' : b.acts.map((a, j) => `<button class="btn small" data-b="${b.id}" data-j="${j}">${a.label}</button>`).join('') || '<span class="muted small">No action needed.</span>'}</div></div>`; }).join('')}</div>
             <div class="center"><button class="btn primary big" id="cab-x">End meeting</button></div>`, 'cab-card');
+          let speaker = list[0] && list[0].id, spoke = 0;
+          const lineOf = id => { const b2 = list.find(x => x.id === id); return b2 ? b2.text.replace(/<[^>]+>/g, '').split('. ')[0] + '.' : ''; };
+          Scenes.modal.attach($('#cab-cv', m), 'cabinet', { ministers: S.cabinet, speaker: () => speaker, line: () => lineOf(speaker) }, 260);
+          const cyc = setInterval(() => { if (!m.isConnected || !$('#cab-cv')) return clearInterval(cyc); spoke = (spoke + 1) % Math.min(5, list.length); speaker = list[spoke].id; }, 4500);
+          m.querySelectorAll('.cab').forEach((el, i) => el.onmouseenter = () => { speaker = list[i].id; });
           m.querySelectorAll('[data-b]').forEach(btn => btn.onclick = () => {
             const b = list.find(x => x.id === btn.dataset.b), a = b.acts[+btn.dataset.j];
             const r = a.fn(); done.push(b.id);
@@ -434,7 +441,7 @@ const Procure = (() => {
       // 2. tender notice
       const deadline = `${30 + Math.floor(rnd(0, 15))} days`;
       const ok = await docModal(`${stepsBar(STEPS, 1)}<div class="doc">
-        <div class="doc-top">${S.flag || ''} ${esc(ministry.toUpperCase())}</div>
+        <div class="doc-top">${myFlag()} ${esc(ministry.toUpperCase())}</div>
         <div class="doc-title">INVITATION FOR BIDS</div><div class="doc-ref">Ref. No. ${ref} · ${proc === 'open' ? 'Open National & International Competitive Bidding' : 'Restricted Tender — pre-qualified bidders only'}</div>
         <ol>
           <li><b>Project:</b> ${P.name} in ${esc(r.name)} (${esc(r.city[2])}).</li>
@@ -524,7 +531,7 @@ const Procure = (() => {
       async function finish(b, flagged, prot) {
         // 6. contract
         const adv = b.price * .15;
-        await docModal(`${stepsBar(STEPS, 5)}<div class="doc"><div class="doc-top">${S.flag || ''} ${esc(ministry.toUpperCase())}</div>
+        await docModal(`${stepsBar(STEPS, 5)}<div class="doc"><div class="doc-top">${myFlag()} ${esc(ministry.toUpperCase())}</div>
           <div class="doc-title">CONTRACT AGREEMENT</div><div class="doc-ref">Contract No. ${ref}/C · ${P.name}, ${esc(r.name)}</div>
           ${prot}
           <ol>
@@ -666,7 +673,7 @@ const Legis = (() => {
       const chamber = COUNTRY.parl || 'Parliament';
       // 1. Draft
       const go = await docModal(`${stepsBar(ST, 0)}<div class="doc bill">
-        <div class="doc-top">${S.flag || ''} ${esc(chamber.toUpperCase())}</div>
+        <div class="doc-top">${myFlag()} ${esc(chamber.toUpperCase())}</div>
         <div class="doc-title">${D.title.toUpperCase()}</div><div class="doc-ref">Bill No. ${no} · Government Bill · Presented by ${mi ? `${esc(mi.name)}, ${esc(mi.title)}` : `the ${ROLE.title}`}</div>
         <p class="long"><i>${D.long}</i></p>
         <p class="enact">BE IT ENACTED by the ${esc(chamber)} of ${esc(S.country)} as follows:</p>
@@ -738,12 +745,12 @@ const Legis = (() => {
         if (!ok) { news(`${up.name} rejects the ${D.title}`); save(); render(); return; }
       }
       // 7. Enactment
-      await docModal(`${stepsBar(ST, ST.length - 1)}<div class="doc bill enacted"><div class="doc-top">${S.flag || ''} OFFICIAL GAZETTE OF ${esc(S.country.toUpperCase())}</div>
+      await docModal(`${stepsBar(ST, ST.length - 1)}<div class="doc bill enacted"><div class="doc-top">${myFlag()} OFFICIAL GAZETTE OF ${esc(S.country.toUpperCase())}</div>
         <div class="doc-title">${D.title.replace(' Bill', ' Act').toUpperCase()} ${yearNow()}</div>
         <p class="m-body">The bill has been ${econ().assent || 'signed by the President and published in the official gazette.'}</p>
         <div class="seal">⚜️ ENACTED</div></div>`, [{ id: 'go', label: '🖋️ Done', primary: true }]);
       applyLawPassed(L, amend ? .7 : 1);
-      save(); render();
+      UI.view = 'office'; save(); render(); officeEvent('signing', { title: D.title.replace(' Bill', ' Act').toUpperCase() });
     } finally { UI.busy = false; }
   }
   function adj(L, pid, o) { let a = 0; if (o.amend && lean(L, pid) < .1 && pid !== S.player.party) a += .15; if (o.lobby && pid !== S.player.party) a += .07; return a; }

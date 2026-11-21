@@ -69,7 +69,7 @@ const NAT = Object.fromEntries(GK.map(g => [g, REGIONS.reduce((s, r) => s + r.mi
 // ---------- state ----------
 let S = null;
 const UI = {
-  screen: 'title', region: 'capital', tab: 'budget', speech: null, busy: false,
+  screen: 'title', region: 'capital', view: 'office', pin: true, tab: 'budget', speech: null, busy: false,
   walkFrom: null, revealed: 0, cloud: null,
   setup: { name: '', country: 'Republic of Veloria', party: 'prog', countryId: 'veloria',
     look: { skin: '#e0ac69', hair: '#1f1308', style: 'short', suit: '#1e293b', tie: '#b91c1c' } },
@@ -97,7 +97,7 @@ function toast(msg, kind = '') {
 // ---------- country metrics ----------
 const count = type => S.buildings ? RK.reduce((n, r) => n + S.buildings[r].filter(b => b === type).length, 0) : 0;
 const totalBuildings = () => S.buildings ? RK.reduce((n, r) => n + S.buildings[r].length, 0) : 0;
-function energy() { return { supply: 45 + count('coal') * 22 + count('solar') * 15, demand: S.gdp * .6 }; }
+function energy() { return { supply: 45 + count('coal') * 22 + count('solar') * 15 + (S.energyBonus || 0), demand: S.gdp * .6 }; }
 function unemployment() { return clamp(13 - (S.stats.economy - 50) * .22 - count('factory') * .7 - (S.projects || []).length * .4, 2, 30); }
 function milStrength() { const m = S.mil; return (COUNTRY.landlocked ? m.army * .6 + m.air * .4 : m.army * .5 + m.air * .3 + m.navy * .2) + count('base') * 6 + (m.alliance ? 15 : 0) + S.stats.security * .1; }
 function devIndex() { return avg(['economy', 'health', 'education', 'housing'].map(k => S.stats[k])) * .6 + Math.min(100, totalBuildings() * 3.5) * .4; }
@@ -511,7 +511,7 @@ async function afterElection() {
   await infoModal('🎉', re ? 'Re-elected!' : `You are the ${ROLE.title}!`,
     (re ? `<p>The people have given you term ${S.term}.${S.term >= MAXT() ? ' It\'s your last — make it count for your legacy.' : ''}</p>`
        : `<p>Welcome, ${ROLE.title} ${esc(S.player.name)}!</p>
-          ${COUNTRY.fictional ? '' : `<p class="muted small">${S.flag} ${esc(S.country)}: ${fmt(S.pop, 1)}M people · GDP ${bigMoney(COUNTRY.gdp)} · debt ${fmt(COUNTRY.debt)}% of GDP · ${COUNTRY.termYears}-year terms${COUNTRY.termLimit ? `, max ${COUNTRY.termLimit}` : ''} · ${COUNTRY.parl}: ${COUNTRY.seats} seats. ${COUNTRY.note}</p>`}
+          ${COUNTRY.fictional ? '' : `<p class="muted small">${myFlag()} ${esc(S.country)}: ${fmt(S.pop, 1)}M people · GDP ${bigMoney(COUNTRY.gdp)} · debt ${fmt(COUNTRY.debt)}% of GDP · ${COUNTRY.termYears}-year terms${COUNTRY.termLimit ? `, max ${COUNTRY.termLimit}` : ''} · ${COUNTRY.parl}: ${COUNTRY.seats} seats. ${COUNTRY.note}</p>`}
           <ul class="tips"><li>🏗️ <b>Build</b>: tap a region, open a tender and award the project to a company.</li>
           <li>🏘️ <b>Housing</b>: sell new homes to citizens — choose affordable, market or luxury prices.</li>
           <li>🏛️ <b>Parliament</b>: you need ${majority()} of ${S.parl.size} votes to pass laws. Form a coalition if you lack a majority.</li>
@@ -531,7 +531,8 @@ function initGovExtras() {
   if (!S.housing) S.housing = { stock: zero(RK), price: 'market', sold: 0, lastSold: 0, lastRev: 0 };
   if (!S.regionMods) S.regionMods = zero(RK);
   if (!S.mil) S.mil = { army: 30, air: 20, navy: 20, alliance: false };
-  if (S.threat === undefined) S.threat = 35;
+  if (S.threat === undefined) S.threat = COUNTRY.threat || 35;
+  if (S.rep === undefined) S.rep = 50;
   if (!S.pop) S.pop = 24;
   if (!S.scandalRisk) S.scandalRisk = 0;
   if (!S.built) S.built = 0;
@@ -564,6 +565,7 @@ function progressProjects() {
       if (p.paid < 1) { const part = Math.min(1 - p.paid, .85 / p.total); S.debt += p.price * part; p.paid += part; }
     }
     if (p.turnsLeft <= 0) {
+      (S.justOpened = S.justOpened || []).push({ type: p.type, region: p.region, company: p.company });
       p.done = true; S.buildings[p.region].push(p.type); S.built++;
       if (P.fx.s) for (const k in P.fx.s) S.lawStat[k] += P.fx.s[k];
       if (P.fx.g) for (const g in P.fx.g) { S.lawMods[g] += P.fx.g[g]; S.ga[g] = clamp(S.ga[g] + P.fx.g[g]); }
@@ -762,6 +764,7 @@ async function endTurn() {
     if (w.ev) S.lastWorld = w.ev.head;
     render();
     await Paper.show(r, a0, approval(), w);
+    await ceremonies();
     if (S.scandalRisk > 0 && Math.random() < .12 * S.scandalRisk) {
       S.scandalRisk = 0; GK.forEach(g => { S.ga[g] = clamp(S.ga[g] - 6); S.eventMods[g] -= 3; }); S.pc = Math.max(0, S.pc - 2);
       news(`BRIBERY SCANDAL: secret gifts to the ${ROLE.title.toLowerCase()} exposed`);
@@ -804,12 +807,7 @@ function applyLawPassed(L, k = 1) {
   if (pg) { S.ga[pg] = clamp(S.ga[pg] + 5); S.eventMods[pg] += 4; toast(`Promise kept! ${GROUPS[pg].name} are delighted.`, 'good'); say('A promise made is a promise kept!'); }
   else say(`The ${L.name} is now law!`);
 }
-function speech(g) {
-  if (S.pc < 1 || S.pendingEvent) return;
-  S.pc--; S.ga[g] = clamp(S.ga[g] + 3); S.eventMods[g] += 3;
-  say(pick(SPEECH_LINES[g])); toast(`${GROUPS[g].name} approval +3`, 'good');
-  save(); render();
-}
+function speech(g) { return Speech.give(g); }
 
 // ---------- game over & legacy ----------
 function legacy(reason) {
@@ -949,7 +947,11 @@ function mapSVG(mode) {
     ${oppMark}${walker}</svg>`;
 }
 function postRender() {
-  if (typeof City !== 'undefined') City.attach($('#city'));
+  const cv = $('#city');
+  const office = cv && S && S.phase === 'govern' && UI.view === 'office';
+  if (office) { City.attach(null); Scenes.top.attach(cv, 'office', {}, 300); }
+  else { Scenes.top.attach(null); City.attach(cv); }
+  document.body.classList.toggle('pinned', !!cv && UI.pin !== false);
   const w = $('#walker');
   if (w && UI.walkTo) {
     const t = UI.walkTo;
@@ -993,9 +995,9 @@ function renderSetup() {
       <div class="setup-form">
         <label>Your name<input data-input="name" maxlength="24" placeholder="e.g. Alex Morgan" value="${esc(su.name)}"></label>
         <div class="lbl">Country</div>
-        <div class="country-grid">${COUNTRIES.map(c => `<button class="country ${su.countryId === c.id ? 'on' : ''}" data-act="setCountry" data-id="${c.id}"><span class="cflag">${c.flag}</span><b>${c.fictional ? 'Fictional country' : c.name}</b><small>${c.fictional ? 'Name it yourself' : `${c.pop >= 100 ? fmt(c.pop) : fmt(c.pop, 1)}M · ${bigMoney(c.gdp)}`}</small></button>`).join('')}</div>
+        <div class="country-grid">${COUNTRIES.map(c => `<button class="country ${su.countryId === c.id ? 'on' : ''}" data-act="setCountry" data-id="${c.id}"><span class="cflag">${Flags.svg(Flags.code(c.id), 30)}</span><b>${c.fictional ? 'Fictional country' : c.name}</b><small>${c.fictional ? 'Name it yourself' : `${c.pop >= 100 ? fmt(c.pop) : fmt(c.pop, 1)}M · ${bigMoney(c.gdp)}`}</small></button>`).join('')}</div>
         ${(() => { const c = COUNTRIES.find(x => x.id === su.countryId) || COUNTRIES[0]; return c.fictional ? `<label>Country name<input data-input="country" maxlength="40" value="${esc(su.country)}"></label>` :
-          `<div class="cfacts"><b>${c.flag} ${c.name}</b> — ${c.system === 'presidential' ? 'presidential republic' : 'parliamentary system'}. You run for <b>${c.title}</b>.
+          `<div class="cfacts"><b>${Flags.svg(Flags.code(c.id), 22)} ${c.name}</b> — ${c.system === 'presidential' ? 'presidential republic' : 'parliamentary system'}. You run for <b>${c.title}</b>.
           <ul><li>👥 Population ${c.pop >= 100 ? fmt(c.pop) : fmt(c.pop, 1)} million · 💵 GDP ${bigMoney(c.gdp)} (IMF 2025) · 📉 Debt ${fmt(c.debt, 1)}% of GDP</li>
           <li>🗓️ ${c.termYears}-year terms${c.termLimit ? ` · limit: ${c.termLimit} term${c.termLimit > 1 ? 's' : ''}` : ' · no term limit'} · 🏛️ ${c.parl}: ${c.seats} seats</li>
           <li>🗺️ ${Object.values(c.regions).map(r => r.city).join(', ')}${c.landlocked ? ' · 🚫 landlocked' : ''}</li></ul>
@@ -1119,7 +1121,8 @@ function projHTML() {
     <div class="muted small">+ home sales last half-year: ${money(S.housing.lastRev)}</div></div>`;
 }
 function regionPicker() {
-  return `<div class="rpick">${REGIONS.map(r => `<button class="${UI.region === r.id ? 'on' : ''}" data-act="region" data-id="${r.id}">${r.short}</button>`).join('')}</div>`;
+  const office = S.phase === 'govern' ? `<button class="${UI.view === 'office' ? 'on' : ''}" data-act="office">🏛️ Office</button>` : '';
+  return `<div class="rpick">${office}${REGIONS.map(r => `<button class="${UI.region === r.id && UI.view !== 'office' ? 'on' : ''}" data-act="region" data-id="${r.id}">${r.short}</button>`).join('')}</div>`;
 }
 function buildHTML() {
   const r = reg(UI.region), here = S.buildings[r.id];
@@ -1214,6 +1217,24 @@ function peopleHTML() {
   <h3>Regions</h3>${REGIONS.map(r => { const a = regionApproval(r); return `<div class="stat"><span>${r.name}</span><div class="bar"><div style="width:${a}%;background:${approvalColor(a)}"></div></div><b>${fmt(a)}%</b><em></em></div>`; }).join('')}
   <h3>Approval</h3>${chartSVG()}`;
 }
+async function ceremonies() {
+  const list = (S.justOpened || []).slice(0, 2); S.justOpened = [];
+  for (const o of list) {
+    const P = PROJECTS[o.type], r = reg(o.region);
+    UI.view = 'city'; UI.region = o.region; render();
+    await new Promise(res => setTimeout(res, 80));
+    City.event('ceremony', { type: o.type, company: o.company });
+    await new Promise(res => {
+      const wrap = $('.cv-wrap'); if (!wrap) return res();
+      const b = document.createElement('div'); b.className = 'cv-banner';
+      b.innerHTML = `🎀 <b>Grand opening:</b> ${P.icon} ${P.name} in ${esc(r.city[2])} <button class="btn small primary">Continue ▶</button>`;
+      wrap.appendChild(b);
+      const done = () => { clearTimeout(tm); b.remove(); res(); };
+      const tm = setTimeout(done, 11000); b.querySelector('button').onclick = done;
+    });
+  }
+  if (list.length) { UI.view = 'office'; render(); }
+}
 function cityMood(g, rid) {
   if (S.phase === 'campaign' && S.camp) { const c = S.camp; return clamp(50 + (c.symP[g] - c.symO[g]) * 2.2 + ((c.rbP[rid] || 0) - (c.rbO[rid] || 0)) * 1.5); }
   return clamp(S.ga[g] + S.regionMods[rid] * .5);
@@ -1232,12 +1253,13 @@ function cityBar(camp) {
     <button class="cvb" data-act="buildPick" ${S.pendingEvent ? 'disabled' : ''}><span>🏗️</span>Build in ${reg(UI.region).short}<small>public tender</small></button>
     <button class="cvb" data-act="tab" data-id="laws" data-scroll="1"><span>📜</span>Draft a bill<small>⭐ ${S.pc}</small></button>
     <button class="cvb" data-act="speechPick" ${S.pc < 1 || S.pendingEvent ? 'disabled' : ''}><span>🎤</span>Give a speech<small>⭐1</small></button>
+    <button class="cvb" data-act="foreign" ${S.pendingEvent ? 'disabled' : ''}><span>✈️</span>Foreign affairs<small>${S.tripTurn === S.turn ? 'trip done' : 'UN · summits · visits'}</small></button>
     <button class="cvb" data-act="tab" data-id="parl" data-scroll="1"><span>🏛️</span>Parliament<small>${coalitionSeats()}/${S.parl.size || 100}</small></button>
     <button class="cvb" data-act="tab" data-id="defense" data-scroll="1"><span>🛡️</span>Defense<small>risk ${warRisk()[0].toLowerCase()}</small></button>
     <button class="btn primary cvb-end" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish →' : 'End term →') : 'End half-year →'}</button></div>`;
 }
 function scrollToCity() {
-  const el = $('.citycard'); if (!el) return;
+  const el = $('.citycard'); if (!el || UI.pin !== false) return;
   const r = el.getBoundingClientRect();
   if (r.top < 40 || r.top > window.innerHeight * .35) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1251,20 +1273,24 @@ async function buildPick() {
 }
 async function speechPick() {
   if (S.pc < 1 || S.pendingEvent) return;
-  const choices = GK.map(g => ({ t: `${GROUPS[g].icon} ${GROUPS[g].name}`, note: `Approval ${fmt(S.ga[g])}% · +3` }));
+  const choices = GK.map(g => ({ t: `${GROUPS[g].icon} Speech to ${GROUPS[g].name.toLowerCase()} in ${reg(UI.region).city[2]}`, note: `Approval ${fmt(S.ga[g])}% · +3 · ⭐1` }));
+  choices.push({ t: '📺 Address to the Nation (live TV)', note: 'Everyone +1.5 · ⭐2', disabled: S.pc < 2 });
   choices.push({ t: 'Cancel', note: '' });
-  const k = await choiceModal({ icon: '🎤', title: 'Give a speech to…', text: 'Costs ⭐1 political capital.', choices });
-  if (k < GK.length) { speech(GK[k]); scrollToCity(); }
+  const k = await choiceModal({ icon: '🎤', title: 'Give a speech', text: 'Your speechwriters have prepared the text. You will deliver it from the podium.', choices });
+  if (k < GK.length) speech(GK[k]); else if (k === GK.length) speech('nation');
 }
 function cityCard() {
   const r = reg(UI.region), camp = S.phase === 'campaign';
   const ra = camp ? poll(r).share * 100 : regionApproval(r);
   const people = r.pop * (S.pop || 24) / 100;
   const moodChip = g => { const v = cityMood(g, r.id); return `<span class="chip" title="${GROUPS[g].name}">${GROUPS[g].icon} ${v >= 60 ? '😊' : v < 40 ? '😠' : '😐'} ${fmt(v)}%</span>`; };
-  return `<div class="card citycard">
-    <div class="cv-head"><div class="cv-title"><b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${fmt(people, 1)}M people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span></div>
+  const office = !camp && UI.view === 'office';
+  const title = office ? `<b>🏛️ Office of the ${ROLE.title}</b><span class="muted small">${myFlag()} ${esc(S.country)} · ${turnLabel()} · approval ${fmt(approval())}%</span>`
+    : `<b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${fmt(people, 1)}M people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span>`;
+  return `<div class="card citycard ${UI.pin !== false ? 'pin' : ''}">
+    <div class="cv-head"><div class="cv-title">${title}</div><button class="pinbtn" data-act="pin" title="Keep the animation pinned at the top">${UI.pin !== false ? '📌' : '📍'}</button>
       <div class="moods">${GK.filter(g => r.mix[g] > 0).map(moodChip).join('')}</div>${regionPicker()}</div>
-    <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">drag to explore · hover people &amp; buildings</div></div>
+    <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">${office ? 'your office · aides bring papers · the TV shows the latest news' : 'drag to explore · hover people &amp; buildings'}</div></div>
     ${cityBar(camp)}
   </div>`;
 }
@@ -1275,7 +1301,7 @@ function renderGovern() {
   return `${cityCard()}<div class="grid3 gov">
     <div class="card leader">
       <div class="portrait">${bubble()}${avatarSVG(S.player.look, mood(), 110, 'float')}</div>
-      <h2>${esc(S.player.name)}</h2><div class="muted">${ROLE.title} of ${S.flag || ''} ${esc(S.country)}</div>
+      <h2>${esc(S.player.name)}</h2><div class="muted">${ROLE.title} of ${myFlag()} ${esc(S.country)}</div>
       <div class="party-chip" style="--pc:${pp.color}">${pp.name}</div>
       <div class="ring" style="--v:${ap};--c:${approvalColor(ap)}"><div><b>${fmt(ap)}%</b><small>approval</small></div></div>
       <div class="kv"><span>Term</span><b>${S.term} of ${MAXT()} · half-year ${inTerm}/${TT()}</b></div>
@@ -1283,6 +1309,7 @@ function renderGovern() {
       <div class="kv"><span>GDP</span><b>${bigMoney(gdpReal())} ${S.lastGrowth !== undefined ? `<em class="${S.lastGrowth >= 0 ? 'up' : 'down'}">${sign(S.lastGrowth)}%</em>` : ''}</b></div>
       <div class="kv"><span>Debt</span><b class="${debtPct() > (S.debtSoft || 80) + 20 ? 'bad' : ''}">${fmt(debtPct())}% of GDP</b></div>
       <div class="kv"><span>Parliament</span><b class="${coalitionSeats() >= majority() ? 'good' : 'bad'}">${coalitionSeats()}/${S.parl.size || 100} seats</b></div>
+      <div class="kv"><span>International reputation</span><b>🌐 ${fmt(S.rep || 50)}</b></div>
       <div class="kv"><span>War risk</span><b class="${warRisk()[1]}">${warRisk()[0]}</b></div>
       ${promisesHTML()}
       <button class="btn primary big wide" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish your time in office →' : 'End term → election') : 'End half-year →'}</button>
@@ -1367,11 +1394,14 @@ const ACT = {
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
   startGame: () => newGame(),
-  region: d => { if (S.phase === 'govern' && !['build', 'housing'].includes(UI.tab)) UI.tab = 'build'; UI.region = d.id; render(); },
+  region: d => { UI.view = 'city'; if (S.phase === 'govern' && !['build', 'housing'].includes(UI.tab)) UI.tab = 'build'; UI.region = d.id; render(); },
   camp: d => campAction(d.id),
   endWeek: () => endWeek(),
   afterElection: () => afterElection(),
-  tab: d => { UI.tab = d.id; render(); if (d.scroll) { const t = $('.tabs'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+  tab: d => { UI.tab = d.id; render(); if (d.scroll) { const t = $('.tabs'), card = $('.citycard'); if (t) { const off = (UI.pin !== false && card ? card.offsetHeight : 0) + 70; window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - off, behavior: 'smooth' }); } } },
+  office: () => { UI.view = 'office'; render(); },
+  pin: () => { UI.pin = UI.pin === false; render(); },
+  foreign: () => Diplomacy.menu(),
   buildPick: () => buildPick(),
   cabinet: () => Cabinet.meeting(),
   speechPick: () => speechPick(),
