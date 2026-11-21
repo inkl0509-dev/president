@@ -117,7 +117,7 @@ function avatarSVG(L, m = 0, size = 120, cls = '') {
 function bubble() { return UI.speech ? `<div class="bubble">${esc(UI.speech)}</div>` : ''; }
 
 // ---------- modals ----------
-function modal(html, wide = false) { const m = $('#modal'); m.innerHTML = `<div class="modal-card ${wide ? 'wide' : ''}">${html}</div>`; m.classList.add('open'); return m; }
+function modal(html, wide = false) { const m = $('#modal'); m.innerHTML = `<div class="modal-card ${wide === true ? 'wide' : wide || ''}">${html}</div>`; m.classList.add('open'); return m; }
 function closeModal() { const m = $('#modal'); m.classList.remove('open'); m.innerHTML = ''; }
 function infoModal(icon, title, html, btn = 'Continue') {
   return new Promise(res => {
@@ -243,6 +243,8 @@ function startCampaign(re) {
       news(`${GROUPS[p.g].name} furious: “${PROMISES[p.g].text}” promise broken`);
     });
   }
+  const used = [S.player.name, S.opp.name];
+  c.minor = PARTIES.filter(p => p.id !== S.player.party && p.id !== S.opp.party).map(p => { const name = pick(OPP_NAMES.filter(n => !used.includes(n))); used.push(name); return { name, party: p.id, look: randomLook() }; });
   S.camp = c; S.phase = 'campaign'; UI.screen = 'campaign'; UI.walkFrom = null;
 }
 
@@ -271,6 +273,7 @@ async function campAction(id) {
   const d = nationalPoll().p - before;
   if (Math.abs(d) >= 0.05) toast(`National poll ${sign(d)}%`, d >= 0 ? 'good' : 'bad');
   save(); render();
+  City.event(id, { g, text: g ? PROMISES[g].text.toLowerCase() : '' });
 }
 
 function applyCampFx(fx) {
@@ -301,18 +304,48 @@ function opponentTurn() {
 
 async function debate() {
   const c = S.camp;
-  await infoModal('🎙️', 'The Big Debate', `<p>Tonight you face <b>${esc(S.opp.name)}</b> on live TV. Millions are watching. Choose your answers carefully.</p>`, 'Take the stage');
+  if (!c.minor) startCampaignMinors(c);
+  const cast = [{ ...c.minor[0], role: 'minor' }, { ...S.player, role: 'player' }, { ...S.opp, role: 'opp' }, { ...c.minor[1], role: 'minor' }];
+  Debate.open({ cast, country: S.country });
+  const { PLAYER, OPP, MOD } = Debate;
+  Debate.panel('<div class="dwait">Click the stage to skip ▶</div>');
+  await Debate.say(MOD, `Good evening and welcome to the presidential debate of ${S.country}!`, 2800);
+  for (const i of [0, 1, 2, 3]) {
+    const who = cast[i];
+    await Debate.say(i, i === PLAYER ? `Good evening, ${S.country}! I'm ${who.name}.` : `Good evening. I'm ${who.name} of the ${partyById(who.party).name}.`, 1700);
+    Debate.react(i === PLAYER ? 1 : 0);
+  }
   const qs = shuffle(DEBATE_Q).slice(0, 3);
   for (const [i, q] of qs.entries()) {
-    const k = await choiceModal({ icon: '🎙️', title: `Question ${i + 1} of 3`, text: q.q, choices: q.a, mode: 'camp' });
+    await Debate.say(MOD, `Question ${i + 1}: ${q.q.replace(/"/g, '')}`, 2600);
+    const k = await Debate.ask(`Question ${i + 1} of 3: ${q.q}`, q.a, a => fxChips(a.fx, 'camp'));
     applyCampFx(q.a[k].fx);
+    const gain = Object.values(q.a[k].fx.p || {}).reduce((x, y) => x + y, 0);
+    await Debate.say(PLAYER, q.a[k].t + '!', 2400);
+    Debate.react(gain * 2.2 + rnd(-2, 3));
+    await Debate.say(OPP, pick(DEBATE_LINES[S.opp.party]), 2200);
+    Debate.react(-rnd(1, 5));
+    if (Math.random() < .6) { const mi = pick([0, 3]); await Debate.say(mi, pick(DEBATE_LINES[cast[mi].party]), 1700); }
   }
-  const you = rnd(2, 12), them = rnd(0, 10), won = you > them;
-  const margin = Math.round(50 + Math.abs(you - them) * 2.5);
+  await Debate.say(MOD, 'Thank you all! And the audience has spoken...', 2200);
+  const score = Debate.meter() + rnd(-6, 6), won = score > 50;
+  const margin = Math.round(clamp(won ? Math.max(51, score) : Math.max(51, 100 - score), 51, 90));
+  Debate.finish(won ? PLAYER : OPP);
   GK.forEach(g => won ? c.symP[g] += 2 : c.symO[g] += 2);
   news(won ? `${S.player.name} wins the debate, polls say` : `${S.opp.name} edges the TV debate`);
   say(won ? 'That went well! Let\'s keep the momentum.' : 'Not my best night. Back to work.');
-  await infoModal(won ? '🏆' : '😬', won ? 'You won the debate!' : 'A tough night', `<p>Instant poll: <b>${margin}%</b> of viewers think ${won ? 'you' : esc(S.opp.name)} won.</p>`);
+  if (won) Confetti.burst(200);
+  await new Promise(res => {
+    Debate.panel(`<div class="dresult ${won ? 'good' : 'bad'}">${won ? '🏆 You won the debate!' : `😬 ${esc(S.opp.name)} won the debate`}</div>
+      <p class="center muted">Instant poll: <b>${margin}%</b> of viewers think ${won ? 'you' : esc(S.opp.name)} won.</p>
+      <div class="center"><button class="btn primary big" id="deb-ok">Continue campaign →</button></div>`);
+    $('#deb-ok').onclick = res;
+  });
+  Debate.close();
+}
+function startCampaignMinors(c) {
+  const used = [S.player.name, S.opp.name];
+  c.minor = PARTIES.filter(p => p.id !== S.player.party && p.id !== S.opp.party).map(p => { const name = pick(OPP_NAMES.filter(n => !used.includes(n))); used.push(name); return { name, party: p.id, look: randomLook() }; });
 }
 
 async function campEvent() {
@@ -348,7 +381,7 @@ function electionNight() {
   S.phase = 'election'; UI.screen = 'election'; UI.revealed = 0;
   news('Polls are closed. The counting begins!');
   save(); render();
-  const step = () => { if (UI.screen !== 'election') return; UI.revealed++; render(); if (UI.revealed < S.elec.order.length) setTimeout(step, 1200); };
+  const step = () => { if (UI.screen !== 'election') return; UI.revealed++; render(); if (UI.revealed < S.elec.order.length) setTimeout(step, 1200); else if (electionTotals().win) Confetti.burst(260); };
   setTimeout(step, 1000);
 }
 function electionTotals(n = S.elec.order.length) {
@@ -763,7 +796,7 @@ async function proposeLaw(id) {
       for (const g in L.g) { S.lawMods[g] += L.g[g]; S.ga[g] = clamp(S.ga[g] + L.g[g] * .5); }
       for (const k in L.s) { S.lawStat[k] += L.s[k]; S.stats[k] = clamp(S.stats[k] + L.s[k] * .3); }
       S.lawCost += L.cost;
-      news(`Parliament passes the ${L.name}`);
+      news(`Parliament passes the ${L.name}`); Confetti.burst(90);
       S.parl.coalition.filter(pid => pid !== S.player.party && lean(L, pid) < -.3).forEach(pid => {
         S.parl.coalition = S.parl.coalition.filter(x => x !== pid);
         news(`${partyById(pid).name} quits coalition in protest over ${L.name}`); toast(`${partyById(pid).name} left your coalition!`, 'bad');
@@ -994,9 +1027,11 @@ function renderCampaign() {
       <div class="vs-mid"><div class="kicker">${c.re ? 'Re-election campaign' : 'Presidential campaign'}</div><div class="weeks">Week ${c.week} of ${c.weeks}${c.week === c.debateWeek ? ' · 🎙️ TV debate this week' : ''}</div></div>
       <div class="cand right"><div><b>${esc(S.opp.name)}</b><small style="color:${op.color}">${op.name}</small></div>${avatarSVG(S.opp.look, 0, 58)}</div>
     </div>
+    ${c.minor ? `<div class="also"><span class="muted small">Also running:</span>${c.minor.map(m => `<span class="mini">${avatarSVG(m.look, 0, 26)}<span>${esc(m.name)}<small style="color:${partyById(m.party).color}">${partyById(m.party).name}</small></span></span>`).join('')}</div>` : ''}
     ${pollBar(np.p, np.u, np.o)}
     <div class="ev">Projected electoral votes: <b style="color:${pp.color}">${np.evP}</b> – <b style="color:${op.color}">${np.evO}</b> <span class="muted">· 51 to win</span></div>
   </div>
+  ${cityCard()}
   <div class="grid3">
     <div class="card mapcard">${bubble()}${mapSVG('camp')}<p class="muted small center">Tap a region to travel there.</p></div>
     <div class="card">
@@ -1175,13 +1210,19 @@ function peopleHTML() {
   <h3>Regions</h3>${REGIONS.map(r => { const a = regionApproval(r); return `<div class="stat"><span>${r.name}</span><div class="bar"><div style="width:${a}%;background:${approvalColor(a)}"></div></div><b>${fmt(a)}%</b><em></em></div>`; }).join('')}
   <h3>Approval</h3>${chartSVG()}`;
 }
+function cityMood(g, rid) {
+  if (S.phase === 'campaign' && S.camp) { const c = S.camp; return clamp(50 + (c.symP[g] - c.symO[g]) * 2.2 + ((c.rbP[rid] || 0) - (c.rbO[rid] || 0)) * 1.5); }
+  return clamp(S.ga[g] + S.regionMods[rid] * .5);
+}
 function cityCard() {
-  const r = reg(UI.region), ra = regionApproval(r);
-  const moodChip = g => { const v = clamp(S.ga[g] + S.regionMods[r.id] * .5); return `<span class="chip" title="${GROUPS[g].name}">${GROUPS[g].icon} ${v >= 60 ? '😊' : v < 40 ? '😠' : '😐'} ${fmt(v)}%</span>`; };
+  const r = reg(UI.region), camp = S.phase === 'campaign';
+  const ra = camp ? poll(r).share * 100 : regionApproval(r);
+  const people = camp || !S.pop ? r.pop * .24 : r.pop * S.pop / 100;
+  const moodChip = g => { const v = cityMood(g, r.id); return `<span class="chip" title="${GROUPS[g].name}">${GROUPS[g].icon} ${v >= 60 ? '😊' : v < 40 ? '😠' : '😐'} ${fmt(v)}%</span>`; };
   return `<div class="card citycard">
-    <div class="cv-head"><div class="cv-title"><b>🏙️ ${r.city[2]}</b><span class="muted small">${r.name} · ${fmt(r.pop * S.pop / 100, 1)}M people · mood ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span></div>
+    <div class="cv-head"><div class="cv-title"><b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${fmt(people, 1)}M people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span></div>
       <div class="moods">${GK.filter(g => r.mix[g] > 0).map(moodChip).join('')}</div>${regionPicker()}</div>
-    <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">drag to explore · hover people &amp; buildings</div></div>
+    <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">${camp ? 'your campaign actions happen here · ' : ''}drag to explore · hover people &amp; buildings</div></div>
   </div>`;
 }
 const TABS = [['budget', '💰 Budget'], ['build', '🏗️ Build'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];

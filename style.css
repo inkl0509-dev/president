@@ -286,6 +286,22 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
 #cv-tip { position: absolute; display: none; pointer-events: none; background: rgba(15,23,42,.94); border: 1px solid var(--line); border-radius: 10px; padding: .45rem .65rem; font-size: .78rem; line-height: 1.4; max-width: 190px; z-index: 2; }
 .cv-hint { position: absolute; right: 10px; bottom: 8px; font-size: .7rem; color: #e2e8f0; background: rgba(15,23,42,.6); padding: .15rem .5rem; border-radius: 99px; pointer-events: none; }
 
+/* debate & candidates */
+.modal-card.debate-card { width: min(1000px, 100%); padding: .8rem; background: #070b1f; border-color: #312e81; }
+.debate-top { display: flex; align-items: center; gap: .45rem; font-size: .72rem; font-weight: 800; letter-spacing: .14em; color: #fca5a5; text-transform: uppercase; margin-bottom: .4rem; }
+.live-dot { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; animation: blink 1s infinite; }
+#debate-cv { width: 100%; aspect-ratio: 900 / 480; display: block; border-radius: 12px; cursor: pointer; }
+.debate-panel { min-height: 64px; margin-top: .7rem; text-align: left; }
+.dq { font-weight: 700; margin-bottom: .5rem; color: #fde68a; }
+.dchoices { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.dwait { text-align: center; color: var(--muted); font-size: .85rem; padding: 1rem; }
+.dresult { text-align: center; font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 800; padding: .4rem; }
+.dresult.good { color: #86efac; } .dresult.bad { color: #fca5a5; }
+.also { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; margin: -.2rem 0 .7rem; }
+.mini { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; font-weight: 600; }
+.mini small { display: block; font-size: .68rem; }
+#confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 90; }
+
 /* game over & hall */
 .over, .hall { max-width: 640px; margin: 0 auto; text-align: center; }
 .over .avatar { display: block; margin: .5rem auto; }
@@ -316,6 +332,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
 }
 @media (max-width: 720px) {
   #city { height: 220px; }
+  .dchoices { grid-template-columns: 1fr; }
   .overview { grid-template-columns: repeat(2, 1fr); }
   main { padding: .6rem; }
   .grid3, .grid3.gov, .grid2, .setup-grid { grid-template-columns: 1fr; }

@@ -55,7 +55,20 @@ const City = (() => {
   let cv = null, ctx = null, raf = 0, region = null, sig = '', cssW = 0, cssH = 0;
   let lots = [], people = [], parts = [], cars = [], hwCars = [], clouds = [];
   let worldW = 1000, viewW = 1000, scale = 1, cam = 0, lastT = 0, time = 0;
-  let drag = null, lastInteract = -99, autoDir = 1, prez = null, prezImg = null, prezKey = '', highway = false, env = .55;
+  let drag = null, lastInteract = -99, autoDir = 1, prez = null, highway = false, env = .55, ev = null, oppStage = null;
+  const imgCache = {};
+  const camp = () => S && S.phase === 'campaign' && S.camp;
+  function imgFor(look, m) {
+    const key = JSON.stringify(look) + m;
+    if (!imgCache[key]) { const im = new Image(); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">${avatarInner(look, m)}</svg>`); imgCache[key] = im; }
+    return imgCache[key];
+  }
+  function wrapLines(t, maxW, size) {
+    ctx.font = `800 ${size}px Inter, system-ui, sans-serif`;
+    const out = []; let cur = '';
+    t.split(' ').forEach(w => { const n = cur ? cur + ' ' + w : w; if (ctx.measureText(n).width > maxW && cur) { out.push(cur); cur = w; } else cur = n; });
+    if (cur) out.push(cur); return out;
+  }
 
   // ---------- helpers ----------
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -76,6 +89,7 @@ const City = (() => {
   const face = v => v >= 60 ? 1 : v < 40 ? -1 : 0;
   function moodOf(g) {
     if (!GROUPS[g]) return 65;
+    if (camp()) { const c = S.camp; return Math.max(0, Math.min(100, 50 + (c.symP[g] - c.symO[g]) * 2.2 + ((c.rbP[region] || 0) - (c.rbO[region] || 0)) * 1.5)); }
     if (!S || !S.ga) return 55;
     return Math.max(0, Math.min(100, S.ga[g] + (S.regionMods ? S.regionMods[region] * .5 : 0)));
   }
@@ -87,7 +101,8 @@ const City = (() => {
     if (!S || !S.buildings) return '';
     const rid = UI.region;
     return JSON.stringify([rid, S.buildings[rid], (S.projects || []).filter(p => p.region === rid).map(p => [p.type, p.turnsLeft]),
-      S.housing ? S.housing.stock[rid] > 0 : 0, S.ga ? GK.filter(g => S.ga[g] + S.regionMods[rid] * .5 < 35) : [], S.turn, Math.round(viewW / 50)]);
+      S.housing ? S.housing.stock[rid] > 0 : 0, S.ga && S.phase === 'govern' ? GK.filter(g => S.ga[g] + S.regionMods[rid] * .5 < 35) : [], S.turn, Math.round(viewW / 50),
+      S.phase, S.camp ? [S.camp.week, S.camp.oppAt, S.opp.name] : 0]);
   }
   function pickGroup(r) { let x = Math.random(), acc = 0; for (const g of GK) { acc += r.mix[g]; if (x <= acc) return g; } return 'workers'; }
   function newWalker(g) {
@@ -117,8 +132,15 @@ const City = (() => {
       if (l.type === 'base') for (let k = 0; k < 4; k++) people.push({ kind: 'soldier', g: 'soldier', x: l.x + 20 + k * 14, y: WALK - 1, dir: 1, speed: 18, phase: k, size: 1, skin: choose(SKINS), state: 'walk', lo: l.x + 10 + k * 14, hi: l.x + l.w - 60 + k * 14 });
       if (l.type === 'park') for (let k = 0; k < 2; k++) people.push({ kind: 'sitter', g: choose(['elderly', 'youth']), x: l.x + 36 + k * 13, y: WALK - 6, dir: 1, size: 1, skin: choose(SKINS), shirt: choose(YOUTH_SHIRTS), state: 'sit', phase: 0 });
     });
-    const angry = S.ga ? GK.filter(g => moodOf(g) < 35 && r.mix[g] > 0).sort((a, b) => moodOf(a) - moodOf(b)) : [];
+    const angry = S.ga && S.phase === 'govern' ? GK.filter(g => moodOf(g) < 35 && r.mix[g] > 0).sort((a, b) => moodOf(a) - moodOf(b)) : [];
     if (angry.length) { const c = lots[0]; for (let k = 0; k < 5; k++) people.push({ kind: 'protester', g: angry[0], x: c.x + 25 + k * 22, y: WALK + (k % 2) * 2, dir: 1, phase: k * 1.3, size: 1, skin: choose(SKINS), shirt: angry[0] === 'youth' ? choose(YOUTH_SHIRTS) : null, state: 'protest' }); }
+    oppStage = null;
+    if (camp() && S.camp.oppAt === region) {
+      oppStage = { x: Math.max(200, worldW - 190), bubble: null };
+      const oc = partyById(S.opp.party).color;
+      for (let k = 0; k < 6; k++) { const fx = oppStage.x - 66 + k * 26 + rand(-3, 3); people.push({ kind: 'oppfan', g: pickGroup(r), x: fx, y: WALK + (k % 2) * 3, dir: fx < oppStage.x ? 1 : -1, phase: k, size: 1, skin: choose(SKINS), shirt: k % 2 ? oc : null, state: 'cheer', flag: oc }); }
+    }
+    if (ev && ev.region !== region) ev = null;
     const econ = S.stats ? S.stats.economy : 50;
     cars = []; const nc = Math.round(2 + econ / 18);
     for (let i = 0; i < nc; i++) cars.push(newCar(i % 2));
@@ -143,8 +165,15 @@ const City = (() => {
     if (S.threat - milStrength() > 10) out.push('Will there be a war?');
     return out;
   }
+  function campLine(m) {
+    const me = S.player.name.split(' ')[0], op = S.opp.name.split(' ')[0];
+    if (m > 0) return choose([`Vote ${me}!`, `I'm with ${me}!`, `${me} for president!`, 'Great speech yesterday!', `${me} gets it.`]);
+    if (m < 0) return choose([`${op} all the way!`, `Never voting ${me}!`, `${op} has my vote.`, 'Same old promises...']);
+    return choose(['Still undecided...', 'Who should I vote for?', 'They all sound the same.', 'Show me your plan!']);
+  }
   function talk(p) {
     const m = face(moodOf(p.g)), lot = lotAt(p.x), iss = issues();
+    if (camp() && Math.random() < .7) { p.bubble = { text: campLine(m), until: time + 3.2 }; return; }
     let t;
     if (lot && m >= 0 && LOT_LINES[lot.type] && Math.random() < .5) t = LOT_LINES[lot.type];
     else if (m < 1 && iss.length && Math.random() < .5) t = choose(iss);
@@ -157,8 +186,24 @@ const City = (() => {
     if (!drag && time - lastInteract > 5 && maxCam > 0) { cam += autoDir * 16 * dt; if (cam >= maxCam) autoDir = -1; if (cam <= 0) autoDir = 1; }
     cam = Math.max(0, Math.min(maxCam, cam));
     const talking = people.filter(q => q.bubble && q.bubble.until > time).length;
+    if (ev && time > ev.t0 + ev.dur) endEvent();
+    if (oppStage && !oppStage.bubble && Math.random() < dt * .35) oppStage.bubble = { text: choose(DEBATE_LINES[S.opp.party]), until: time + 2.6 };
+    if (oppStage && oppStage.bubble && oppStage.bubble.until < time) oppStage.bubble = null;
+    if (ev) spawnEventParts(dt);
     people.forEach(p => {
-      p.phase += dt * (p.state === 'walk' ? (p.speed || 20) / 3.2 : 5);
+      if (p.bubble && p.bubble.until < time) p.bubble = null;
+      p.phase += dt * (p.state === 'walk' || p.state === 'crowd' ? (p.speed || 26) / 3.2 : 5);
+      if (p.state === 'crowd') {
+        const d = p.cx - p.x;
+        if (Math.abs(d) < 2) { p.x = p.cx; p.state = ev && ev.type === 'townhall' ? 'sit' : ev && ev.type === 'fund' ? 'idle' : 'cheer'; p.dir = ev ? (Math.sign(ev.x - p.x) || 1) : 1; p.timer = 99; }
+        else { p.dir = Math.sign(d); p.x += p.dir * 40 * dt; }
+        return;
+      }
+      if (p.cx != null && ev && (p.state === 'cheer' || p.state === 'sit' || p.state === 'idle')) {
+        if (!p.bubble && talking < 4 && Math.random() < dt * .08) p.bubble = { text: ev.type === 'townhall' ? choose(['What about jobs?', 'How will you pay for it?', 'Thank you for coming!', 'What about rents?']) : ev.type === 'fund' ? choose(['Cheers!', 'Happy to help!', 'To victory!']) : choose([`${ev.first}! ${ev.first}!`, 'Woohoo!', `We love you, ${ev.first}!`, 'Four more years!'.replace('Four more years!', ev.chant)]), until: time + 2 };
+        return;
+      }
+      if (p.kind === 'resident') { if (!p.said && time > p.talkAt) { p.said = true; p.bubble = { text: ev && ev.happy ? choose(['You\'ve got my vote!', 'Love your ideas!', 'Come in for tea!']) : choose(['I\'ll think about it...', 'Not interested, sorry.', 'Hmm, convince me.']), until: time + 3 }; } return; }
       if (p.kind === 'walker') {
         if (p.state === 'walk') {
           p.x += p.dir * p.speed * dt;
@@ -178,7 +223,6 @@ const City = (() => {
         if (p.x < p.lo) { p.x = p.lo; p.dir = 1; } if (p.x > p.hi) { p.x = p.hi; p.dir = -1; }
         if (p.kind === 'kid' && Math.random() < dt * .4) p.dir *= -1;
       } else if (p.kind === 'protester' && !p.bubble && Math.random() < dt * .15) p.bubble = { text: SIGNS[p.g], until: time + 2 };
-      if (p.bubble && p.bubble.until < time) p.bubble = null;
     });
     cars.forEach(c => { c.x += (c.lane ? -1 : 1) * c.speed * dt; if (c.x > worldW + 40) c.x = -40; if (c.x < -40) c.x = worldW + 40; });
     hwCars.forEach(c => { c.x += c.dir * c.speed * dt; if (c.x > worldW + 20) c.x = -20; if (c.x < -20) c.x = worldW + 20; });
@@ -188,19 +232,170 @@ const City = (() => {
       if (l.type === 'coal' && Math.random() < dt * 6) parts.push({ x: l.x + 40 + rand(-10, 10), y: BASE - 92, vx: rand(2, 8), vy: rand(-16, -10), r: rand(6, 10), life: 0, max: rand(3, 5), c: '240,240,245' });
       if (l.type === 'park' && Math.random() < dt * 30) parts.push({ x: l.x + l.w / 2 + 20, y: BASE - 20, vx: rand(-12, 12), vy: rand(-42, -30), r: 1.4, life: 0, max: 1.1, c: '125,200,255', g: true });
     });
-    parts.forEach(q => { q.life += dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.g) q.vy += 70 * dt; else q.r += dt * 3; });
+    parts.forEach(q => { q.life += dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.g) q.vy += 70 * dt; else if (q.conf) { q.rot += dt * 6; q.x += Math.sin(time * 3 + q.rot) * .3; } else if (!q.txt) q.r += dt * 3; });
     parts = parts.filter(q => q.life < q.max).slice(-300);
     updatePrez(dt);
   }
   function updatePrez(dt) {
     const p = prez; if (!p) return;
     if (p.bubble && p.bubble.until < time) p.bubble = null;
+    if (ev && ev.prezX != null) {
+      const d = ev.prezX - p.x, step = 70 * dt;
+      if (Math.abs(d) > step) { p.dir = Math.sign(d); p.walking = true; p.phase += dt * 10; p.x += Math.sign(d) * step; p.onStage = false; }
+      else {
+        p.x = ev.prezX; p.walking = false; p.onStage = !!ev.stage; p.dir = ev.face || p.dir;
+        if (!p.bubble && time - (p.lastSay || -9) > 3.3) { p.bubble = { text: choose(ev.lines), until: time + 2.6 }; p.lastSay = time; }
+      }
+      return;
+    }
+    p.onStage = false;
     if (p.wait > 0) { p.wait -= dt; p.walking = false; if (p.wait <= 0) { p.lot = choose(lots); p.target = p.lot.x + p.lot.w / 2 + rand(-25, 25); } return; }
     if (p.target == null) { p.wait = 1; return; }
     const d = p.target - p.x, step = 42 * dt;
     p.dir = Math.sign(d) || 1; p.walking = true; p.phase += dt * 9;
     if (Math.abs(d) <= step) { p.x = p.target; p.target = null; p.wait = rand(3, 5); p.walking = false; p.bubble = { text: PREZ_LINES[p.lot.type] || 'Hello, everyone!', until: time + 3 }; }
     else p.x += Math.sign(d) * step;
+  }
+
+  // ---------- campaign events ----------
+  function endEvent() {
+    people.forEach(p => { if (p.cx != null) { p.cx = null; p.state = 'walk'; p.timer = rand(1, 4); p.bubble = null; } });
+    people = people.filter(p => p.kind !== 'resident');
+    ev = null;
+    if (prez) { prez.onStage = false; prez.wait = 1.5; prez.target = null; }
+  }
+  function event(type, data = {}) {
+    if (!cv || !lots.length || !camp()) return;
+    if (ev) endEvent();
+    const pc = partyById(S.player.party).color, first = S.player.name.split(' ')[0], last = S.player.name.split(' ').slice(-1)[0], city = reg(region).city[2], oppN = S.opp.name.split(' ')[0];
+    const x = Math.max(120, Math.min(worldW - 120, cam + viewW / 2));
+    const L = {
+      rally: [`Thank you, ${city}!`, 'Together we will win!', 'Are you ready for change?!', `${partyById(S.player.party).name} — forward!`],
+      promise: [`I promise: ${data.text}!`, 'A promise made is a promise kept!'],
+      townhall: ['Great question!', 'I hear you.', 'Here is my plan...', `${data.g ? GROUPS[data.g].name : 'You'} deserve better!`],
+      tv: ['Have you seen my new ad?', 'Vote for real change!'],
+      attack: [`${oppN} has no plan!`, `Can you really trust ${oppN}?`],
+      fund: ['Thank you for your support!', 'Every dollar counts!', 'Cheers, everyone!'],
+      door: ['Hi! Can I count on your vote?', `I'm ${first} — nice to meet you!`],
+    };
+    ev = { type, t0: time, dur: type === 'door' ? 7 : 10, x, data, region, lines: L[type] || ['Hello!'], stage: type === 'rally' || type === 'promise', pc, first, last: last.toUpperCase(), chant: `${first} for president!` };
+    if (type === 'door') {
+      const homes = lots.filter(l => ['houses', 'apartments', 'chalets', 'housing', 'barn'].includes(l.type));
+      const l = homes.sort((a, b) => Math.abs(a.x + a.w / 2 - x) - Math.abs(b.x + b.w / 2 - x))[0] || lots[0];
+      ev.doorX = l.x + 24; ev.x = ev.doorX; ev.prezX = ev.doorX - 16; ev.face = 1;
+      const g = pickGroup(reg(region)); ev.happy = moodOf(g) >= 45;
+      people.push({ kind: 'resident', g, x: ev.doorX + 2, y: WALK - 2, dir: -1, phase: 0, size: 1, skin: choose(SKINS), shirt: g === 'youth' ? choose(YOUTH_SHIRTS) : null, state: 'idle', bubble: null, talkAt: time + 2.8 });
+    } else if (type === 'tv' || type === 'attack') { ev.prezX = x + 96; ev.face = -1; }
+    else ev.prezX = x;
+    cam = Math.max(0, Math.min(worldW - viewW, ev.x - viewW / 2)); lastInteract = time + 6;
+    if (prez) { if (Math.abs(prez.x - ev.prezX) > viewW * .45) prez.x = ev.prezX + (prez.x < ev.prezX ? -1 : 1) * viewW * .45; prez.bubble = null; prez.lastSay = time - 2.5; }
+    if (['rally', 'promise', 'townhall', 'fund'].includes(type)) {
+      const n = type === 'fund' ? 8 : type === 'townhall' ? 10 : 16;
+      people.filter(p => p.kind === 'walker' && p.state !== 'inside').sort((a, b) => Math.abs(a.x - x) - Math.abs(b.x - x)).slice(0, n).forEach((p, i) => {
+        const side = i % 2 ? 1 : -1, row = Math.floor(i / 2);
+        p.cx = type === 'townhall' ? x + side * (24 + row * 15) : type === 'fund' ? x + side * (14 + row * 20) : x + side * (16 + row * 12) + rand(-3, 3);
+        p.state = 'crowd'; p.bubble = null; p.y = WALK + (row % 2) * 3;
+      });
+    }
+  }
+  function spawnEventParts(dt) {
+    const e = ev;
+    if (e.stage && Math.random() < dt * 34) parts.push({ x: e.x + rand(-110, 110), y: rand(10, 70), vx: rand(-8, 8), vy: rand(28, 50), r: rand(2, 3.5), life: 0, max: 4.5, conf: choose(['#f43f5e', '#facc15', '#22c55e', '#3b82f6', '#a855f7', '#ffffff', e.pc]), rot: rand(0, 6) });
+    if (e.stage && Math.random() < dt * 2.5) parts.push({ x: e.x + rand(-70, 70), y: WALK - 40, vx: rand(-4, 4), vy: rand(-22, -14), r: 10, life: 0, max: 2, txt: choose(['👏', '🙌', '❤️', '🎉']) });
+    if (e.type === 'fund' && Math.random() < dt * 4) parts.push({ x: e.x + rand(-70, 70), y: BASE - 34, vx: rand(-4, 4), vy: rand(-24, -14), r: 10, life: 0, max: 2.4, txt: choose(['💵', '💰', '🥂']) });
+    if (e.type === 'door' && e.happy && time - e.t0 > 3 && Math.random() < dt * 3) parts.push({ x: e.doorX + rand(-8, 8), y: WALK - 36, vx: rand(-4, 4), vy: rand(-20, -12), r: 10, life: 0, max: 2, txt: '❤️' });
+    if (e.type === 'townhall' && Math.random() < dt * .8) parts.push({ x: e.x + rand(-60, 60), y: WALK - 40, vx: 0, vy: -14, r: 10, life: 0, max: 1.6, txt: choose(['✋', '❓', '👍']) });
+  }
+  function stageAt(x, color, label, big) {
+    const w = big ? 160 : 120, bh = big ? 92 : 72, top = BASE - 20;
+    ctx.strokeStyle = '#334155'; ctx.lineWidth = 3; line(x - w / 2 - 6, top, x - w / 2 - 6, top - bh - 14); line(x + w / 2 + 6, top, x + w / 2 + 6, top - bh - 14); line(x - w / 2 - 6, top - bh - 14, x + w / 2 + 6, top - bh - 14);
+    R(x - w / 2, top - bh, w, bh, color); R(x - w / 2, top - bh, w, 6, 'rgba(255,255,255,.35)'); R(x - w / 2, top - 8, w, 8, 'rgba(0,0,0,.2)');
+    text('★  ★  ★', x, top - bh + 18, 9, 'rgba(255,255,255,.9)');
+    const lines = wrapLines(label, w - 14, big ? 11 : 9);
+    lines.slice(0, 3).forEach((l, i) => text(l, x, top - bh + 36 + i * (big ? 14 : 11), big ? 11 : 9, '#fff', 800));
+    for (let i = 0; i < 8; i++) circ(x - w / 2 + 10 + i * (w - 20) / 7, top - bh - 14, 3, Math.sin(time * 6 + i) > 0 ? '#fde68a' : '#78350f');
+    R(x - w / 2 - 12, top, w + 24, 20, '#1f2937'); R(x - w / 2 - 12, top, w + 24, 3, '#64748b');
+    for (let i = 0; i < 10; i++) poly([x - w / 2 - 12 + i * (w + 24) / 10, top + 3, x - w / 2 - 12 + (i + 1) * (w + 24) / 10, top + 3, x - w / 2 - 12 + (i + .5) * (w + 24) / 10, top + 11], i % 2 ? color : '#ffffff');
+    [x - w / 2 - 24, x + w / 2 + 12].forEach(sx => { R(sx, BASE - 46, 14, 46, '#0f172a'); circ(sx + 7, BASE - 36, 4, '#334155'); circ(sx + 7, BASE - 18, 5.5, '#334155'); });
+    if (big) R(x + 18, top - 24, 14, 24, '#0f172a');
+  }
+  function billboard(x, attack) {
+    const bx = x - 82, by = BASE - 168, bw = 164, bh = 92;
+    R(x - 54, by + bh, 6, BASE - by - bh, '#475569'); R(x + 48, by + bh, 6, BASE - by - bh, '#475569');
+    R(bx - 5, by - 5, bw + 10, bh + 10, '#0f172a');
+    for (let i = 0; i < 14; i++) { const on = Math.floor(time * 6 + i) % 2; circ(bx - 2 + i * (bw + 4) / 13, by - 3, 2, on ? '#fde68a' : '#57534e'); circ(bx - 2 + i * (bw + 4) / 13, by + bh + 3, 2, on ? '#57534e' : '#fde68a'); }
+    const g = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+    const pc = partyById(S.player.party).color;
+    if (attack) { g.addColorStop(0, '#450a0a'); g.addColorStop(1, '#dc2626'); } else { g.addColorStop(0, pc); g.addColorStop(1, '#0f172a'); }
+    ctx.fillStyle = g; ctx.fillRect(bx, by, bw, bh);
+    const im = imgFor(attack ? S.opp.look : S.player.look, attack ? -1 : 1);
+    if (im.complete) ctx.drawImage(im, bx + 4, by + 8, 70, 82);
+    if (attack) {
+      ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 5; line(bx + 10, by + 14, bx + 68, by + 86); line(bx + 68, by + 14, bx + 10, by + 86);
+      if (Math.floor(time * 3) % 2) text('NO PLAN!', bx + 120, by + 42, 15, '#fff', 800);
+      text(`${S.opp.name.split(' ').slice(-1)[0].toUpperCase()}?`, bx + 120, by + 62, 10, '#fecaca', 800); text('Think again.', bx + 120, by + 78, 8, '#fff', 600);
+    } else {
+      text('VOTE', bx + 120, by + 32, 12, '#fde68a', 800);
+      text(S.player.name.split(' ').slice(-1)[0].toUpperCase(), bx + 120, by + 54, S.player.name.length > 12 ? 12 : 16, '#fff', 800);
+      text(partyById(S.player.party).name, bx + 120, by + 72, 7, '#e2e8f0', 700); text('✔', bx + 120, by + 86, 10, '#4ade80', 800);
+    }
+    R(bx, by + (time * 40) % bh, bw, 2, 'rgba(255,255,255,.15)');
+  }
+  function gala(x) {
+    const w = 190;
+    R(x - w / 2, BASE - 72, 4, 72, '#e5e7eb'); R(x + w / 2 - 4, BASE - 72, 4, 72, '#e5e7eb');
+    poly([x - w / 2 - 10, BASE - 72, x, BASE - 116, x + w / 2 + 10, BASE - 72], '#f8fafc');
+    for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? '#fbbf24' : '#fff'; ctx.beginPath(); ctx.arc(x - w / 2 - 1 + i * (w + 2) / 9.5, BASE - 72, (w + 2) / 19, 0, Math.PI); ctx.fill(); }
+    text('FUNDRAISING GALA', x, BASE - 82, 8, '#a16207', 800);
+    for (let i = 0; i < 13; i++) circ(x - w / 2 + 8 + i * 14.5, BASE - 62 + Math.sin(i * 1.3) * 3, 2.2, ['#fde68a', '#f472b6', '#93c5fd'][(i + Math.floor(time * 3)) % 3]);
+    [-60, 0, 60].forEach(dx => { ctx.fillStyle = '#f8fafc'; ctx.beginPath(); ctx.ellipse(x + dx, BASE - 16, 18, 5, 0, 0, Math.PI * 2); ctx.fill(); R(x + dx - 16, BASE - 16, 32, 8, '#f1f5f9'); R(x + dx - 1, BASE - 26, 2, 8, '#fef3c7'); circ(x + dx, BASE - 27, 1.8, Math.random() < .5 ? '#f59e0b' : '#fde047'); });
+    rr(x + w / 2 + 14, BASE - 14, 60, 12, 3, '#0f172a'); R(x + w / 2 + 28, BASE - 20, 30, 7, '#1e293b'); circ(x + w / 2 + 22, BASE - 2, 3, '#111'); circ(x + w / 2 + 66, BASE - 2, 3, '#111');
+  }
+  function townhallSet(x) {
+    R(x - 100, BASE - 96, 4, 96, '#cbd5e1'); R(x + 96, BASE - 96, 4, 96, '#cbd5e1');
+    R(x - 108, BASE - 100, 216, 16, '#1e40af');
+    for (let i = 0; i < 12; i++) { ctx.fillStyle = i % 2 ? '#1e40af' : '#f8fafc'; ctx.beginPath(); ctx.arc(x - 99 + i * 18, BASE - 84, 9, 0, Math.PI); ctx.fill(); }
+    ctx.fillStyle = 'rgba(15,23,42,.55)'; ctx.fillRect(x - 96, BASE - 75, 192, 75);
+    R(x - 1, BASE - 70, 2, 50, '#475569'); rr(x - 44, BASE - 86, 88, 18, 4, '#1e3a8a'); text('TOWN HALL MEETING', x, BASE - 74, 7.5, '#fff', 800);
+    R(x + 14, BASE - 26, 14, 26, '#1e293b'); R(x + 14, BASE - 26, 14, 3, ev.pc);
+    people.forEach(p => { if (p.cx != null) { R(p.cx - 5, WALK - 9, 11, 2, '#78350f'); R(p.cx - 5, WALK - 9, 1.5, 9, '#78350f'); R(p.cx + 4.5, WALK - 9, 1.5, 9, '#78350f'); R(p.cx - (p.dir > 0 ? 6 : -4.5), WALK - 18, 1.5, 10, '#78350f'); } });
+  }
+  function drawEventBack() {
+    if (oppStage) stageAt(oppStage.x, partyById(S.opp.party).color, `${S.opp.name.split(' ').slice(-1)[0].toUpperCase()} FOR PRESIDENT`, false);
+    if (!ev) return;
+    const e = ev;
+    if (e.stage) {
+      [e.x - 112, e.x + 112].forEach(lx => { R(lx - 2, BASE - 130, 4, 130, '#334155'); R(lx - 7, BASE - 136, 14, 8, '#111827'); });
+      stageAt(e.x, e.pc, e.type === 'promise' ? `I PROMISE: ${e.data.text.toUpperCase()}` : `${e.last} FOR PRESIDENT`, true);
+      for (let i = 0; i < 7; i++) { const bx = e.x - 96 + i * 32, by = BASE - 130 - ((time * 14 + i * 23) % 90); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = .6; line(bx, by + 8, bx + Math.sin(time + i) * 2, by + 22); ctx.fillStyle = i % 2 ? e.pc : '#ffffff'; ctx.beginPath(); ctx.ellipse(bx, by, 5, 6.5, 0, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (e.type === 'tv' || e.type === 'attack') billboard(e.x, e.type === 'attack');
+    if (e.type === 'fund') gala(e.x);
+    if (e.type === 'townhall') townhallSet(e.x);
+    if (e.type === 'door') { const open = Math.min(1, (time - e.t0 - 1.5) / .6); if (open > 0) R(e.doorX - 6, BASE - 18, 10 * open, 18, '#1c1917'); }
+  }
+  function drawEventFront() {
+    if (oppStage) {
+      drawCandidate(S.opp.look, 0, oppStage.x, BASE - 20, false, 0, -1, S.opp.name.split(' ').slice(-1)[0].toUpperCase(), partyById(S.opp.party).color, '#fff');
+      if (oppStage.bubble) drawBubble(oppStage.x, BASE - 94, oppStage.bubble.text);
+    }
+    if (ev && ev.stage) {
+      ctx.globalCompositeOperation = 'lighter';
+      [[ev.x - 112, 0], [ev.x + 112, 2]].forEach(([lx, ph]) => {
+        const tx = ev.x + Math.sin(time * 1.3 + ph) * 40;
+        ctx.fillStyle = 'rgba(254,249,195,.16)'; ctx.beginPath(); ctx.moveTo(lx - 4, BASE - 134); ctx.lineTo(lx + 4, BASE - 134); ctx.lineTo(tx + 26, BASE - 10); ctx.lineTo(tx - 26, BASE - 10); ctx.closePath(); ctx.fill();
+      });
+      ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+  function drawCandidate(look, m, x, y, walking, phase, dir, label, labelBg, labelFg = '#1a1205') {
+    const im = imgFor(look, m);
+    const sw = walking ? Math.sin(phase) * 4 : 0;
+    ctx.lineCap = 'round'; ctx.strokeStyle = look.suit; ctx.lineWidth = 3.4;
+    line(x, y - 14, x + sw, y); line(x, y - 14, x - sw, y);
+    R(x + sw - 3, y - 1, 5, 2, '#111'); R(x - sw - 3, y - 1, 5, 2, '#111');
+    if (im.complete) { ctx.save(); if (dir < 0) { ctx.translate(x * 2, 0); ctx.scale(-1, 1); } ctx.drawImage(im, x - 18, y - 56, 36, 42); ctx.restore(); }
+    if (label) { ctx.font = '800 5.8px Inter, system-ui, sans-serif'; const w = ctx.measureText(label).width + 10; rr(x - w / 2, y - 70, w, 10, 5, labelBg); text(label, x, y - 62.5, 5.8, labelFg, 800); }
   }
 
   // ---------- background ----------
@@ -257,7 +452,11 @@ const City = (() => {
     R(0, ROAD_T, worldW, ROAD_B - ROAD_T, '#374151');
     for (let x = 0; x < worldW; x += 30) R(x, (ROAD_T + ROAD_B) / 2 - 1, 16, 2, '#facc15');
     R(0, ROAD_B, worldW, H - ROAD_B, '#1f2937');
-    for (let x = 60; x < worldW; x += 160) { R(x, BASE - 34, 2, 34, '#475569'); circ(x + 1, BASE - 35, 3, env > .3 ? '#fde68a' : '#94a3b8'); }
+    const share = camp() ? poll(reg(region)).share : 0, pc = camp() ? partyById(S.player.party).color : 0, oc = camp() ? partyById(S.opp.party).color : 0;
+    for (let x = 60; x < worldW; x += 160) {
+      R(x, BASE - 34, 2, 34, '#475569'); circ(x + 1, BASE - 35, 3, env > .3 ? '#fde68a' : '#94a3b8');
+      if (camp()) { const mine = hash(x) < share; R(x + 3, BASE - 30, 12, 15, mine ? pc : oc); text((mine ? S.player.name : S.opp.name)[0], x + 9, BASE - 19, 8, '#fff', 800); R(x + 3, BASE - 30, 12, 2, '#fff'); }
+    }
   }
   function drawCars() {
     cars.forEach(c => {
@@ -484,9 +683,11 @@ const City = (() => {
   function drawPerson(p) {
     if (p.state === 'inside') return;
     const s = p.size || 1, x = p.x, y = p.y, L = GLOOK[p.g], shirt = p.shirt || L.shirt || '#64748b';
-    const moving = p.state === 'walk';
+    const moving = p.state === 'walk' || p.state === 'crowd';
+    const cheering = p.state === 'cheer';
+    const flag = p.flag || (cheering && ev && ev.stage ? ev.pc : null);
     const sw = moving ? Math.sin(p.phase) * 4 * s : 0;
-    const sit = p.state === 'sit', jump = p.state === 'protest' ? Math.abs(Math.sin(time * 4 + p.phase)) * 3 : 0;
+    const sit = p.state === 'sit', jump = p.state === 'protest' ? Math.abs(Math.sin(time * 4 + p.phase)) * 3 : cheering ? Math.abs(Math.sin(time * 6 + p.phase)) * 3.5 : 0;
     const by = y - jump, hip = by - (sit ? 8 : 12) * s;
     ctx.lineCap = 'round';
     ctx.strokeStyle = L.pants; ctx.lineWidth = 2.6 * s;
@@ -504,7 +705,11 @@ const City = (() => {
     } else if (p.state === 'protest') {
       line(x, sh, x + 2 * s, sh - 10 * s); ctx.strokeStyle = '#78350f'; ctx.lineWidth = 1.2; line(x + 2 * s, by - 18 * s, x + 2 * s, by - 50 * s);
       R(x - 15 * s, by - 60 * s, 34 * s, 11 * s, '#fff'); text(SIGNS[p.g], x + 2 * s, by - 52 * s, 5 * s, '#dc2626', 800);
-    } else if (sit) { line(x, sh, x + 5 * s, sh + 4 * s); }
+    } else if (cheering) {
+      const wave = Math.sin(time * 8 + p.phase) * 2 * s;
+      line(x, sh, x - 5 * s, sh - 9 * s + wave); line(x, sh, x + 5 * s, sh - 9 * s - wave);
+      if (flag) { ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1; line(x + 5 * s, sh - 9 * s - wave, x + 5 * s, sh - 21 * s - wave); const fw = Math.sin(time * 9 + p.phase) * 1.5; poly([x + 5 * s, sh - 21 * s - wave, x + 14 * s, sh - 19 * s - wave + fw, x + 5 * s, sh - 15 * s - wave], flag); }
+    } else if (sit) { const up = ev && ev.type === 'townhall' && Math.sin(time * .8 + p.phase * 3) > .75; if (up) line(x, sh, x + 2 * s, sh - 11 * s); else line(x, sh, x + 5 * s, sh + 4 * s); }
     else { line(x, sh, x - sw * .8, sh + 8 * s); line(x, sh, x + sw * .8, sh + 8 * s); }
     if (L.brief && moving) R(x + sw * .8 - 2.5 * s, sh + 8 * s, 5 * s, 4 * s, '#78350f');
     if (L.cane) { ctx.strokeStyle = '#78350f'; ctx.lineWidth = 1.2 * s; line(x + p.dir * 5 * s, sh + 5 * s, x + p.dir * 6 * s, by); }
@@ -521,16 +726,11 @@ const City = (() => {
     else if (m < 0) ctx.arc(x, hy + 3.4 * s, 1.8 * s, 1.15 * Math.PI, 1.85 * Math.PI);
     else { ctx.moveTo(x - 1.5 * s, hy + 2 * s); ctx.lineTo(x + 1.5 * s, hy + 2 * s); }
     ctx.stroke();
-    if (p.kind !== 'soldier') { ctx.font = `${7.5 * s}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText(EMO[m], x, hy - 8 * s); }
+    if (p.kind !== 'soldier' && p.kind !== 'oppfan') { ctx.font = `${7.5 * s}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText(EMO[m], x, hy - 8 * s); }
   }
   function drawPrez() {
-    const p = prez; if (!p || !prezImg || !prezImg.complete) return;
-    const x = p.x, y = WALK + 2, sw = p.walking ? Math.sin(p.phase) * 4 : 0;
-    ctx.lineCap = 'round'; ctx.strokeStyle = S.player.look.suit; ctx.lineWidth = 3.4;
-    line(x, y - 14, x + sw, y); line(x, y - 14, x - sw, y);
-    ctx.save(); if (p.dir < 0) { ctx.translate(x * 2, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(prezImg, x - 18, y - 56, 36, 42); ctx.restore();
-    rr(x - 22, y - 70, 44, 10, 5, 'rgba(251,191,36,.95)'); text('★ PRESIDENT', x, y - 62.5, 5.8, '#1a1205', 800);
+    const p = prez; if (!p) return;
+    drawCandidate(S.player.look, mood(), p.x, p.onStage ? BASE - 20 : WALK + 2, p.walking, p.phase, p.dir, camp() ? '★ YOU' : '★ PRESIDENT', 'rgba(251,191,36,.95)');
   }
   function drawBubble(x, y, t) {
     ctx.font = '600 8px Inter, system-ui, sans-serif';
@@ -549,14 +749,21 @@ const City = (() => {
     ctx.setTransform(k, 0, 0, k, -cam * k, 0);
     drawGround();
     lots.forEach(l => { if (l.x + l.w < cam - 40 || l.x > cam + viewW + 40) { l.top = BASE - 100; return; } l.top = B[l.type](l); });
-    parts.forEach(q => { ctx.fillStyle = `rgba(${q.c},${(1 - q.life / q.max) * (q.g ? .9 : .55)})`; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2); ctx.fill(); });
-    lots.forEach(l => { const name = lotName(l); ctx.font = '700 7.5px Inter, system-ui, sans-serif'; const w = ctx.measureText(name).width + 12; rr(l.x + l.w / 2 - w / 2, l.top - 6, w, 12, 6, 'rgba(15,23,42,.72)'); text(name, l.x + l.w / 2, l.top + 2.5, 7.5, '#f8fafc'); });
+    drawEventBack();
+    parts.forEach(q => {
+      const a = Math.max(0, 1 - q.life / q.max);
+      if (q.conf) { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); R(-q.r, -q.r / 2, q.r * 2, q.r, q.conf); ctx.restore(); return; }
+      if (q.txt) { ctx.globalAlpha = a; ctx.font = `${q.r}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText(q.txt, q.x, q.y); ctx.globalAlpha = 1; return; }
+      ctx.fillStyle = `rgba(${q.c},${a * (q.g ? .9 : .55)})`; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2); ctx.fill();
+    });
+    lots.forEach(l => { if (ev && ev.type !== 'door' && Math.abs(l.x + l.w / 2 - ev.x) < l.w / 2 + 70) return; if (oppStage && Math.abs(l.x + l.w / 2 - oppStage.x) < l.w / 2 + 50) return; const name = lotName(l); ctx.font = '700 7.5px Inter, system-ui, sans-serif'; const w = ctx.measureText(name).width + 12; rr(l.x + l.w / 2 - w / 2, l.top - 6, w, 12, 6, 'rgba(15,23,42,.72)'); text(name, l.x + l.w / 2, l.top + 2.5, 7.5, '#f8fafc'); });
     drawStreet();
-    [...people].sort((a, b) => a.y - b.y).forEach(drawPerson);
     drawPrez();
+    [...people].sort((a, b) => a.y - b.y).forEach(drawPerson);
+    drawEventFront();
     drawCars();
     people.forEach(p => { if (p.bubble && p.state !== 'inside') drawBubble(p.x, p.y - (p.kind === 'protester' ? 66 : 42) * (p.size || 1), p.bubble.text); });
-    if (prez && prez.bubble) drawBubble(prez.x, WALK - 72, prez.bubble.text);
+    if (prez && prez.bubble) drawBubble(prez.x, (prez.onStage ? BASE - 20 : WALK + 2) - 74, prez.bubble.text);
     if (env < .45) { ctx.setTransform(k, 0, 0, k, 0, 0); ctx.fillStyle = `rgba(120,105,80,${(.45 - env) * .7})`; ctx.fillRect(0, 0, viewW, BASE); }
   }
 
@@ -577,13 +784,14 @@ const City = (() => {
     const tip = document.getElementById('cv-tip'); if (!tip) return;
     const rect = cv.getBoundingClientRect(), wx = (e.clientX - rect.left) / scale + cam, wy = (e.clientY - rect.top) / scale;
     let html = '';
-    if (prez && Math.abs(prez.x - wx) < 14 && wy > WALK - 62 && wy < WALK + 4) html = `<b>★ President ${esc(S.player.name)}</b><br>Visiting ${prez.lot ? lotName(prez.lot) : 'the city'}`;
+    if (prez && Math.abs(prez.x - wx) < 14 && wy > (prez.onStage ? BASE - 82 : WALK - 62) && wy < WALK + 4) html = `<b>★ ${camp() ? 'Candidate' : 'President'} ${esc(S.player.name)}</b><br>${ev ? 'Campaigning here!' : `Visiting ${prez.lot ? lotName(prez.lot) : 'the city'}`}`;
     if (!html) {
       const p = people.filter(q => q.state !== 'inside' && Math.abs(q.x - wx) < 7 * (q.size || 1) && wy > q.y - 36 * (q.size || 1) && wy < q.y + 3).sort((a, b) => b.y - a.y)[0];
       if (p) {
         if (p.kind === 'builder') html = '<b>👷 Construction worker</b><br>Building for your government';
         else if (p.kind === 'soldier') html = `<b>🪖 Soldier</b><br>Army strength ${fmt(S.mil.army)}`;
-        else { const v = moodOf(p.g), m = face(v); html = `<b>${GROUPS[p.g].icon} ${p.kind === 'kid' ? 'School kid' : GROUPS[p.g].name.replace(/s$/, '')}${p.kind === 'protester' ? ' (protesting)' : ''}</b><br>${EMO[m]} ${m > 0 ? 'Happy' : m < 0 ? 'Unhappy' : 'Okay'} · ${fmt(v)}%${p.bubble ? `<br>“${esc(p.bubble.text)}”` : ''}`; }
+        else if (p.kind === 'oppfan') html = `<b>📢 ${esc(S.opp.name)} supporter</b><br>At the ${partyById(S.opp.party).name} rally`;
+        else { const v = moodOf(p.g), m = face(v); const feel = camp() ? (m > 0 ? 'Supports you' : m < 0 ? `Supports ${esc(S.opp.name)}` : 'Undecided') : (m > 0 ? 'Happy' : m < 0 ? 'Unhappy' : 'Okay'); html = `<b>${GROUPS[p.g].icon} ${p.kind === 'kid' ? 'School kid' : GROUPS[p.g].name.replace(/s$/, '')}${p.kind === 'protester' ? ' (protesting)' : ''}</b><br>${EMO[m]} ${feel} · ${fmt(v)}%${p.bubble ? `<br>“${esc(p.bubble.text)}”` : ''}`; }
       }
     }
     if (!html && wy < BASE + 2) {
@@ -592,6 +800,7 @@ const City = (() => {
         let info = '';
         if (l.type === 'site') { const c = comp(l.p.company); info = `Built by ${c.name}<br>${l.p.turnsLeft} half-year${l.p.turnsLeft > 1 ? 's' : ''} left`; }
         else if (l.type === 'housing') info = `${S.housing.stock[region].toLocaleString()} homes for sale here`;
+        else if (!S.stats) info = PROJECTS[l.type] ? PROJECTS[l.type].desc : '';
         else if (l.type === 'hospital') info = `National health: ${fmt(S.stats.health)}`;
         else if (l.type === 'school') info = `National education: ${fmt(S.stats.education)}`;
         else if (l.type === 'factory') info = `Unemployment: ${fmt(unemployment(), 1)}%`;
@@ -633,5 +842,5 @@ const City = (() => {
   }
   // send the president to the newest construction site
   function visit(type) { const l = lots.find(x => x.type === type) || lots.find(x => x.type === 'site' && x.p.type === type); if (l && prez) { prez.lot = l; prez.target = l.x + l.w / 2; prez.wait = 0; cam = Math.max(0, Math.min(worldW - viewW, l.x - viewW / 3)); lastInteract = time; } }
-  return { attach, visit };
+  return { attach, visit, event };
 })();

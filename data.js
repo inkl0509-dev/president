@@ -474,3 +474,11 @@ GOV_EVENTS.push(
       { t: 'Too expensive', fx: {}, news: 'Jet deal rejected' },
     ] },
 );
+
+// What each party's candidates say during the TV debate
+const DEBATE_LINES = {
+  prog:  ['We will stand with working families!', 'Healthcare is a right, not a privilege!', 'My opponent only cares about the rich.'],
+  cons:  ['Lower taxes, law and order!', 'Strong economy, strong nation!', 'My opponent will raise your taxes!'],
+  green: ['There is no planet B!', 'Clean energy means good jobs!', 'We need action, not words!'],
+  lib:   ['Get the government out of your way!', 'Freedom and opportunity for all!', 'Less bureaucracy, more freedom!'],
+};

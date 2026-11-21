@@ -9,6 +9,12 @@ Pure **HTML + CSS + JavaScript** — no build step, no frameworks. Optional **Fi
 ## How to play
 
 **Campaign (8 weeks)**
+- Every action plays out in the animated city: rallies get a stage with banners, spotlights, balloons, confetti
+  and a cheering crowd waving flags; door-to-door shows you knocking and a resident answering; town halls get a
+  canopy and seated audience asking questions; TV and attack ads appear on giant billboards; fundraisers become a
+  gala tent with guests. Your rival holds their own rallies with fans, and campaign posters cover the lamp posts.
+- The TV debate is a live studio: all four party candidates at podiums, a moderator, spotlights, party banners,
+  a live audience that cheers or groans, and an on-screen "who is winning" meter that decides the result.
 - You get 3 actions per week: rallies, door-to-door, town halls, TV ads, attack ads, fundraisers, promises.
 - Tap a region on the map — your character walks there. Big regions give more electoral votes (51 of 100 wins).
 - Your rival campaigns too. Random events and a live TV debate can swing the race.
@@ -47,7 +53,8 @@ index.html        page shell
 style.css         all styles
 data.js           game content: parties, regions, cities, projects, companies, laws, events
 game.js           game logic + UI
-city.js           animated city view (canvas)
+city.js           animated city view + campaign scenes (canvas)
+stage.js          animated TV debate studio + confetti
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured
 firestore.rules   security rules for the leaderboard
