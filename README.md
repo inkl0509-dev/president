@@ -64,6 +64,25 @@ Edit `COUNTRIES` in `data.js` to add more countries.
 - **Opening ceremonies**: when a project is finished, the city view shows a ribbon-cutting ceremony.
 - Flags are drawn in SVG so they also display on Windows (which has no emoji flags).
 
+## Government team & online multiplayer
+
+- **👥 Government tab**: appoint ministers and the managing directors of state-owned enterprises (Maldives: MTCC, HDC,
+  STELCO, MACL, MPL, STO, MWSC, WAMCO, IASL, BML). Type a name, switch a person's gender/look, replace them, or move
+  people between posts.
+- **🌐 Online multiplayer** (title screen):
+  1. Create a game (name + country) or join an open one; type your name and pick a party.
+  2. Choose **Run for president** or **Party member**. The host starts the campaign.
+  3. Each candidate plays their own campaign against computer rivals; their national vote share is the score. Party
+     members knock on doors for their candidate (+0.4 points per shift, up to 6). The host counts the votes.
+  4. The winner governs. In the 👥 Government tab they **offer posts** (minister or SOE managing director) to players,
+     dismiss them, and approve or reject proposals.
+  5. Players **accept** a post or **decline and join the opposition**. Ministers propose budget changes, tenders, bills and
+     memos; MDs ask for capital or tariff changes; the opposition asks questions in parliament, issues statements and
+     tables no-confidence motions (3 actions per half-year each). Everyone sees the state of the nation live.
+- Where it is stored: in the published Claude page, the page's shared database (people need **Contributor** access);
+  on your own site, Cloud Firestore (fill in `config.js` and deploy `firestore.rules`).
+- Re-election campaigns after the first term are played by the president alone against computer rivals.
+
 ## Game clock & experts
 
 - **Clock**: while governing, game time runs — **2 real minutes = 1 month**, so a half-year lasts 12 minutes and ends
@@ -152,6 +171,9 @@ scenes.js         flags, office, speeches, UN, summits, state visits, cabinet ro
 money.js          central banks, banks, taxes, reserves, financing decisions
 agenda.js         manifesto & delivery tracker
 experts.js        expert policy roundtable
+team.js           ministers & SOE managing directors
+net.js            storage adapter (Claude page db or Firebase)
+online.js         online multiplayer: lobby, election, posts, proposals, opposition
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured
 firestore.rules   security rules for the leaderboard

@@ -570,3 +570,52 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
 .ex-pc .good { color: #86efac; } .ex-pc .bad { color: #fca5a5; }
 .ex-who { font-size: .7rem; color: var(--muted); margin-left: 24px; }
 .experts { text-align: left; } .experts h2 { text-align: center; }
+
+/* ---------- Government team ---------- */
+.team h3 { margin: 14px 0 6px; }
+.tm-list { display: grid; gap: 5px; }
+.tm-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); flex-wrap: wrap; }
+.tm-row.is-human { border-color: rgba(96,165,250,.55); background: rgba(96,165,250,.08); }
+.tm-av { flex: 0 0 34px; }
+.tm-post { flex: 1 1 200px; min-width: 0; } .tm-post b { display: block; font-size: .82rem; } .tm-post small { color: var(--muted); font-size: .7rem; display: block; }
+.tm-name { flex: 0 1 190px; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: .3rem .5rem; font: inherit; font-size: .85rem; font-weight: 600; }
+.tm-name:focus { outline: none; border-color: var(--gold); }
+.tm-ctl { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.tm-b { background: var(--card2); border: 1px solid var(--line); border-radius: 7px; padding: .2rem .4rem; cursor: pointer; }
+.tm-move, .tm-ctl select { background: var(--card2); border: 1px solid var(--line); border-radius: 7px; color: var(--text); font-size: .75rem; padding: .2rem; max-width: 190px; }
+.tm-human { font-size: .7rem; color: #93c5fd; }
+.on-team { padding: 10px; border-radius: 12px; border: 1px solid rgba(96,165,250,.35); background: rgba(96,165,250,.06); margin-bottom: 10px; }
+.badge { background: #ef4444; color: #fff; border-radius: 999px; padding: 0 7px; font-size: .75rem; }
+
+/* ---------- Online ---------- */
+.on-card { max-width: 1100px; margin: 0 auto; }
+.on-card h2 { margin: 0 0 4px; } .on-card h3 { margin: 14px 0 6px; }
+.on-card input, .on-card select, .on-card textarea { background: var(--card2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: .4rem .6rem; font: inherit; }
+.on-card textarea { width: 100%; min-height: 64px; resize: vertical; }
+.on-card label { display: inline-flex; flex-direction: column; gap: 3px; font-size: .78rem; color: var(--muted); margin: 0 10px 8px 0; }
+.on-games { display: grid; gap: 6px; }
+.on-g { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.on-g b { display: block; } .on-g small { color: var(--muted); }
+.on-create { display: flex; gap: 6px; flex-wrap: wrap; } .on-create input { flex: 1 1 220px; }
+.on-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.on-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+@media (max-width: 800px) { .on-grid { grid-template-columns: 1fr; } }
+.on-box { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); }
+.on-box h3 { margin-top: 0; }
+.on-roles { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.on-players { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
+.on-pl { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); }
+.on-pl.me { border-color: var(--gold); } .on-pl > div:nth-child(2) { flex: 1; } .on-pl b { font-size: .85rem; } .on-pl small { display: block; color: var(--muted); font-size: .7rem; }
+.on-role { font-size: .68rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: rgba(148,163,184,.2); white-space: nowrap; }
+.on-role.r-president { background: rgba(251,191,36,.25); color: #fde68a; } .on-role.r-minister, .on-role.r-md { background: rgba(96,165,250,.22); color: #bfdbfe; }
+.on-role.r-opposition { background: rgba(239,68,68,.2); color: #fca5a5; } .on-role.r-candidate { background: rgba(34,197,94,.2); color: #86efac; }
+.on-win { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: linear-gradient(135deg, rgba(251,191,36,.18), rgba(251,191,36,.05)); border: 1px solid rgba(251,191,36,.4); }
+.on-offer { padding: 10px; border-radius: 10px; background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.4); margin: 6px 0; } .on-offer > div { margin-top: 6px; }
+.on-forms h4 { margin: 8px 0 6px; }
+.on-f { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: .82rem; } .on-f.col { flex-direction: column; align-items: stretch; } .on-f > span { min-width: 120px; }
+.on-news { font-size: .78rem; display: grid; gap: 3px; margin-top: 8px; max-height: 170px; overflow: auto; }
+.on-cab { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px; font-size: .78rem; }
+.on-cab > div { padding: 4px 6px; border-radius: 8px; background: rgba(255,255,255,.03); } .on-cab small { display: block; color: var(--muted); font-size: .66rem; } .on-cab b { font-size: .8rem; }
+.on-act { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.03); margin-bottom: 5px; font-size: .8rem; }
+.on-act p { margin: 3px 0 6px; } .on-st { float: right; font-size: .72rem; color: var(--muted); }
+.on-pl { flex-wrap: wrap; } .on-pl .on-role { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }

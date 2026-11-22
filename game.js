@@ -124,7 +124,7 @@ function mood() {
   if (S.ga) { const a = approval(); return a > 55 ? 1 : a < 40 ? -1 : 0; }
   return 1;
 }
-function save() { if (S && S.phase !== 'over') store.set(SAVE_KEY, S); }
+function save() { if (S && S.phase !== 'over') store.set(SAVE_KEY, S); if (typeof Online !== 'undefined' && S && S.online) Online.publishSoon(); }
 function news(t) { S.news.unshift(t); S.news = S.news.slice(0, 14); }
 function say(t) { UI.speech = t; }
 function toast(msg, kind = '') {
@@ -517,6 +517,11 @@ function leaveCoalition(pid) {
 async function afterElection() {
   const t = electionTotals(), re = S.elec.re;
   S.lastElection = { evP: t.evP, evO: t.evO, pvShare: t.pv / (t.pv + t.ov) * 100 };
+  if (S.online && !re) {               // online game: the best vote share among players wins
+    if (!S.online.result) return Online.reportResult(t);
+    t.win = S.online.result === 'won';
+    if (!t.win) return Online.becomeMember();
+  }
   if (!t.win) return gameOver(re ? 'lost-re' : 'lost-first');
   const newP = S.camp.newPromises;
   if (!re) {
@@ -914,7 +919,7 @@ async function loadCloud() {
 function chip(icon, text, cls = '') { return `<span class="tchip ${cls}">${icon} ${text}</span>`; }
 function renderTop() {
   const t = $('#topstats');
-  if (!S || UI.screen === 'title' || UI.screen === 'setup' || UI.screen === 'hall') { t.innerHTML = ''; return; }
+  if (!S || UI.screen === 'title' || UI.screen === 'setup' || UI.screen === 'hall' || UI.screen === 'online') { t.innerHTML = ''; return; }
   if (S.phase === 'campaign' && S.camp) {
     const c = S.camp;
     t.innerHTML = chip('🗓️', `Week ${c.week}/${c.weeks}`) + chip('💵', `$${Math.round(c.funds)}M`) + chip('⚡', `${c.ap} actions`);
@@ -1048,6 +1053,7 @@ function renderTitle() {
     <div class="menu">
       ${saved ? `<button class="btn primary big" data-act="continue">▶ Continue as ${esc(saved.player.name)}</button>` : ''}
       <button class="btn ${saved ? '' : 'primary'} big" data-act="newGame">✨ New game</button>
+      <button class="btn big" data-act="online">🌐 Online multiplayer</button>
       <button class="btn big ghost" data-act="hall">🏆 Hall of Fame</button>
     </div>
     <p class="muted small">${Cloud.enabled ? '🟢 Online Hall of Fame connected' : 'Progress is saved in this browser.'}</p>
@@ -1145,7 +1151,7 @@ function renderElection() {
     <div class="grid2">${mapSVG('elec')}<div class="erows">${rows}</div></div>
     ${done ? `<div class="verdict big ${full.win ? 'good' : 'bad'}">${full.win ? `🎉 ${esc(S.player.name)} WINS!` : `${esc(S.opp.name)} wins the election`}</div>
       <p class="center muted">Popular vote: ${fmt(full.pv / (full.pv + full.ov) * 100, 1)}% – ${fmt(full.ov / (full.pv + full.ov) * 100, 1)}%</p>
-      <div class="center"><button class="btn primary big" data-act="afterElection">${full.win ? (E.re ? 'Begin second term →' : 'Go to the palace →') : 'See your story →'}</button></div>` : ''}
+      <div class="center"><button class="btn primary big" data-act="afterElection">${S.online && !E.re ? (S.online.result ? 'See the online result →' : 'Send my result to the online game →') : full.win ? (E.re ? 'Begin second term →' : 'Go to the palace →') : 'See your story →'}</button></div>` : ''}
   </div>`;
 }
 function statBar(k) {
@@ -1370,10 +1376,10 @@ function cityCard() {
     ${cityBar(camp)}
   </div>`;
 }
-const TABS = [['agenda', '📜 Manifesto'], ['money', '🏦 Money'], ['budget', '💰 Budget'], ['build', '🏗️ Build'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];
+const TABS = [['agenda', '📜 Manifesto'], ['team', '👥 Government'], ['money', '🏦 Money'], ['budget', '💰 Budget'], ['build', '🏗️ Build'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];
 function renderGovern() {
   const ap = approval(), pp = partyById(S.player.party), inTerm = (S.turn - 1) % TT() + 1;
-  const tabHTML = { agenda: () => Manifesto.html(), money: () => Money.html(), budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
+  const tabHTML = { team: () => Team.html(), agenda: () => Manifesto.html(), money: () => Money.html(), budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
   return `${cityCard()}<div class="grid3 gov">
     <div class="card leader">
       <div class="portrait">${bubble()}${avatarSVG(S.player.look, mood(), 110, 'float')}</div>
@@ -1455,6 +1461,7 @@ function render() {
     case 'govern': html = renderGovern(); break;
     case 'over': html = renderOver(); break;
     case 'hall': html = renderHall(); break;
+    case 'online': html = Online.render(); break;
   }
   app.innerHTML = html;
   renderTop(); renderTicker(); postRender();
@@ -1466,6 +1473,7 @@ const ACT = {
   newGame: () => { UI.screen = 'setup'; render(); },
   continue: () => { const s = store.get(SAVE_KEY); if (s) { S = s; resume(); } },
   hall: () => { UI.screen = 'hall'; render(); loadCloud(); },
+  online: () => Online.open(),
   setParty: d => { UI.setup.party = d.id; render(); },
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
@@ -1523,6 +1531,7 @@ function resume() {
   if (S.phase === 'campaign') UI.screen = 'campaign';
   else if (S.phase === 'election') { UI.screen = 'election'; UI.revealed = S.elec.order.length; }
   else if (S.phase === 'govern') UI.screen = 'govern';
+  else if (S.phase === 'waiting' || S.phase === 'member') { UI.screen = 'online'; setTimeout(() => Online.open(), 0); }
   else UI.screen = 'title';
   render();
   if (S.phase === 'govern' && S.pendingEvent) turnStart();

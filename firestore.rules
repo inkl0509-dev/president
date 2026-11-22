@@ -19,5 +19,24 @@ service cloud.firestore {
                     && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
     }
+    // Online multiplayer games. Players are anonymous (no sign-in), so anyone with the
+    // site can create and join games. Documents are size-limited; nobody can delete.
+    match /games/{gameId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.size() < 60;
+      allow delete: if false;
+      match /players/{playerId} {
+        allow read: if true;
+        allow create, update: if request.resource.data.keys().hasOnly(['name', 'party', 'role', 'joined', 'campaign', 'volunteer', 'response', 'seen', 'look']);
+        allow delete: if false;
+      }
+      match /acts/{actId} {
+        allow read: if true;
+        allow create: if request.resource.data.keys().hasOnly(['uid', 'name', 'role', 'post', 'kind', 'type', 'payload', 'text', 'status', 'ts', 'turn'])
+                      && (!('text' in request.resource.data) || request.resource.data.text.size() <= 400);
+        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedAt', 'note']);
+        allow delete: if false;
+      }
+    }
   }
 }
