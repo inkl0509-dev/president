@@ -72,7 +72,9 @@ const Money = (() => {
   }
   // ---- called once per half-year, after the budget is settled ----
   function step(r) {
-    const fin = ensure(); if (!peg()) return [];
+    const fin = ensure();
+    if (S.inflRebound) { S.infl += S.inflRebound; S.inflRebound = 0; }   // price controls wear off
+    if (!peg()) return [];
     const f = F(), msgs = [];
     const airports = typeof count === 'function' ? count('airport') : 0;
     let inflow = (70 + (S.stats.economy - 50) * 2.5 + (fin.fca ? 50 : 0) + (fin.tgst - 17) * 25 + (fin.green - 12) * 6 + airports * 12 - Math.max(0, S.infl - S.inflTarget) * 6 - fin.adv * 15) * rnd(.8, 1.2);
@@ -195,7 +197,7 @@ const Money = (() => {
     return `<div class="money">
       <div class="cb-card"><div class="cb-h">🏦 <div><b>${f.cb}</b><small>${f.since ? `Founded ${f.since} · ` : ''}${f.cur}</small></div></div>
         <p class="small">${f.regimeText}.${f.tools ? `<br><span class="muted">Tools: ${f.tools}</span>` : ''}</p></div>
-      ${top}${cal}
+      ${top}<button class="btn small" data-act="experts" data-id="${peg() ? 'fx' : 'deficit'}">🧠 Ask the experts what to do</button>${cal}
       <h3>🧾 Financing decisions</h3><p class="muted small">Proposals from the Minister of Finance. Each shows what happens before you approve.</p>
       <div class="choices tight">${acts || '<p class="muted small">No financing decisions available.</p>'}</div>
       ${f.taxes ? `<h3>💰 Taxes <small class="muted">collected by ${f.taxAuth}</small></h3><table class="fin-t">${f.taxes.map(([k, v], i) => `<tr><td>${k}</td><td>${i === 1 && fin.tgst !== 17 ? `<b>${fin.tgst}%</b> (game)` : i === 2 && fin.green !== 12 ? `<b>$${fin.green}</b> a night (game)` : v}</td></tr>`).join('')}</table>` : ''}

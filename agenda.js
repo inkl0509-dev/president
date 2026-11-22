@@ -61,7 +61,7 @@ const Manifesto = (() => {
   }
   // ---- cabinet decisions ----
   function decisionRow(a) {
-    const mi = Cabinet.get(a.min) || { icon: '👔', title: 'Minister' };
+    const mi = a.kind === 'expert' ? { icon: '🧠', title: 'Expert roundtable' } : Cabinet.get(a.min) || { icon: '👔', title: 'Minister' };
     let st, act = '';
     if (a.law) { const ok = S.laws.includes(a.law); st = ok ? status('ok', '✅ Law enacted') : status('wait', '📜 Bill not passed yet'); if (!ok) act = btn('tab', 'laws', 'Laws →'); }
     else if (a.tender) {
@@ -69,9 +69,10 @@ const Manifesto = (() => {
       const opened = built(a.tender) > (a.base || 0);
       st = opened ? status('ok', `✅ ${PROJECTS[a.tender].name} opened`) : p ? status('go', `🚧 Building · ${p.turnsLeft} half-year${p.turnsLeft === 1 ? '' : 's'} left`) : status('wait', '⏳ Tender not launched');
       if (!opened && !p) act = btn('tender', a.tender, 'Tender →');
-    } else if (a.kind === 'money') st = status(/agreed|Passed|approved|sold|lent|begins/i.test(a.result || '') ? 'ok' : 'wait', esc(a.result || 'Decided'));
+    } else if (a.kind === 'expert') st = status('ok', '✅ ' + esc(a.result || 'Done'));
+    else if (a.kind === 'money') st = status(/agreed|Passed|approved|sold|lent|begins/i.test(a.result || '') ? 'ok' : 'wait', esc(a.result || 'Decided'));
     else st = status('ok', '✅ Done');
-    return `<tr><td class="nowrap">${turnLabel(a.turn)}</td><td>${mi.icon} <small>${esc(mi.title)}</small></td><td><b>${esc(a.label)}</b><br><small class="muted">${a.kind === 'money' ? 'Financing decision' : MIN_EFFECT[a.min] || ''}</small></td><td>${st} ${act}</td></tr>`;
+    return `<tr><td class="nowrap">${turnLabel(a.turn)}</td><td>${mi.icon} <small>${esc(mi.title)}</small></td><td><b>${esc(a.label)}</b><br><small class="muted">${a.kind === 'money' ? 'Financing decision' : a.kind === 'expert' ? 'On: ' + esc(a.issue || '') : MIN_EFFECT[a.min] || ''}</small></td><td>${st} ${act}</td></tr>`;
   }
   // ---- "what to do next" ----
   function nextSteps() {
@@ -83,6 +84,8 @@ const Manifesto = (() => {
     }
     S.promises.filter(p => p.term === S.term && !p.broken && !S.laws.includes(PROMISES[p.g].law)).slice(0, 2).forEach(p => out.push(['📜', `Pass the ${lawById(PROMISES[p.g].law).name} — you promised it.`, btn('tab', 'laws', 'Laws →')]));
     (S.pledges || []).filter(d => d.term === S.term && !d.broken).forEach(d => { const P = DEV_PLEDGES.find(x => x.id === d.id); if (built(P.type) - d.base < P.n && !building(P.type)) out.push([P.icon, `${pledgeText(P)} — no tender running yet.`, btn('tender', P.type, 'Tender →')]); });
+    const iss = typeof Experts !== 'undefined' ? Experts.urgent() : [];
+    if (iss.length) out.push(['🧠', `${iss[0].name}. Ask the experts what to do.`, `<button class="btn small" data-act="experts" data-id="${iss[0].id}">Ask the experts →</button>`]);
     if (!(S.cabinetDone && S.cabinetDone.turn === S.turn)) out.push(['👔', 'Hold this half-year\'s cabinet meeting to hear your ministers.', `<button class="btn small" data-act="cabinet">Cabinet →</button>`]);
     const left = TT() - ((S.turn - 1) % TT() + 1);
     return { list: out.slice(0, 4), left };

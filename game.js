@@ -84,7 +84,40 @@ const UI = {
 function regionApproval(r) { return clamp(GK.reduce((s, g) => s + r.mix[g] * S.ga[g], 0) + (S.regionMods ? S.regionMods[r.id] : 0)); }
 function approval() { if (!S || !S.ga) return 0; return REGIONS.reduce((s, r) => s + regionApproval(r) * r.pop / 100, 0); }
 function debtPct() { return S && S.gdp ? S.debt / S.gdp * 100 : 0; }
-function turnLabel(t = S.turn) { return `Year ${Math.ceil(t / 2)} · ${t % 2 ? 'H1' : 'H2'}`; }
+function turnLabel(t = S.turn) { return `${t % 2 ? 'Jan–Jun' : 'Jul–Dec'} ${2026 + Math.ceil(t / 2)}`; }
+
+// ---------- game clock: 2 real minutes = 1 month, 6 months = one half-year ----------
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SEC_PER_MONTH = 120;
+const Clock = {
+  month() { return Math.min(5, Math.floor((S.clk || 0) / SEC_PER_MONTH)); },
+  label() { return `${MONTHS[(S.turn % 2 ? 0 : 6) + this.month()]} ${2026 + Math.ceil(S.turn / 2)}`; },
+  speed() { return UI.speed === undefined ? 1 : UI.speed; },
+  html() {
+    const sp = this.speed(), b = (v, i, t) => `<button class="${sp === v ? 'on' : ''}" data-act="speed" data-id="${v}" title="${t}">${i}</button>`;
+    return `<div class="clock ${sp ? '' : 'paused'}" id="clock" title="Game time: 2 minutes = 1 month. The half-year ends automatically after June/December — or end it now with the button.">
+      <div class="clk-d">📅 <b id="clk-m">${this.label()}</b></div>
+      <div class="clk-bar">${'<i class="tick"></i>'.repeat(5)}<i class="fill" id="clk-f" style="width:${(S.clk || 0) / (SEC_PER_MONTH * 6) * 100}%"></i></div>
+      <div class="clk-s">${b(0, '⏸', 'Pause')}${b(1, '▶', 'Normal: 2 min = 1 month')}${b(3, '⏩', 'Fast: 40 s = 1 month')}</div></div>`;
+  },
+};
+function paintClock() {
+  const m = $('#clk-m'), f = $('#clk-f'), c = $('#clock');
+  if (m) m.textContent = Clock.label();
+  if (f) f.style.width = `${(S.clk || 0) / (SEC_PER_MONTH * 6) * 100}%`;
+  if (c) { c.classList.toggle('paused', !Clock.speed() || !!S.pendingEvent || !!$('#modal.open')); c.querySelectorAll('[data-act=speed]').forEach(x => x.classList.toggle('on', +x.dataset.id === Clock.speed())); }
+}
+function clockTick() {
+  if (typeof S === 'undefined' || !S || S.phase !== 'govern') return;
+  const sp = Clock.speed();
+  if (!sp || UI.busy || S.pendingEvent || document.hidden || $('#modal.open')) return paintClock();
+  const m0 = Clock.month(); S.clk = (S.clk || 0) + sp;
+  if (S.clk >= SEC_PER_MONTH * 6) { S.clk = SEC_PER_MONTH * 6 - 1; toast(`📅 ${Clock.label()} is over — time for the half-year review.`, 'good'); endTurn(); return; }
+  const m1 = Clock.month();
+  if (m1 !== m0) { toast(`📅 ${Clock.label()}`, 'good'); if (m1 === 5) toast('⏳ Last month of the half-year. The budget review comes at the end of this month.'); save(); }
+  paintClock();
+}
+setInterval(clockTick, 1000);
 function mood() {
   if (!S) return 1;
   if (S.phase === 'campaign' && S.camp) { const n = nationalPoll(); return n.p > n.o + 2 ? 1 : n.p < n.o - 2 ? -1 : 0; }
@@ -762,7 +795,7 @@ function advisorTip() {
   return `🧑‍💼 Advisor: steady progress, ${ROLE.title}. Keep it up.`;
 }
 async function endTurn() {
-  if (UI.busy || S.pendingEvent) return; UI.busy = true;
+  if (UI.busy || S.pendingEvent) return; UI.busy = true; S.clk = 0;
   try {
     const a0 = approval(), r = simulateTurn(), a1 = approval();
     r.msgs.push(...Money.step(r));
@@ -1290,12 +1323,13 @@ function cityBar(camp) {
       <button class="btn primary cvb-end" data-act="endWeek">${c.week === c.weeks ? 'Election Day 🗳️' : 'End week →'}</button></div>`;
   }
   return `<div class="cv-bar">
-    <div class="cvb-info"><b>⭐ ${S.pc} PC</b><small class="muted">${turnLabel()}</small></div>
-    <button class="cvb" data-act="cabinet" ${S.pendingEvent ? 'disabled' : ''}><span>👔</span>Cabinet meeting<small>${S.cabinetDone && S.cabinetDone.turn === S.turn ? 'held' : 'briefings'}</small></button>
-    <button class="cvb" data-act="buildPick" ${S.pendingEvent ? 'disabled' : ''}><span>🏗️</span>Build in ${reg(UI.region).short}<small>public tender</small></button>
-    <button class="cvb" data-act="tab" data-id="laws" data-scroll="1"><span>📜</span>Draft a bill<small>⭐ ${S.pc}</small></button>
-    <button class="cvb" data-act="speechPick" ${S.pc < 1 || S.pendingEvent ? 'disabled' : ''}><span>🎤</span>Give a speech<small>⭐1</small></button>
-    <button class="cvb" data-act="foreign" ${S.pendingEvent ? 'disabled' : ''}><span>✈️</span>Foreign affairs<small>${S.tripTurn === S.turn ? 'trip done' : 'UN · summits · visits'}</small></button>
+    ${Clock.html()}<div class="cvb-info"><b>⭐ ${S.pc} PC</b></div>
+    <button class="cvb" data-act="cabinet" ${S.pendingEvent ? 'disabled' : ''}><span>👔</span>Cabinet<small>${S.cabinetDone && S.cabinetDone.turn === S.turn ? 'held' : 'briefings'}</small></button>
+    <button class="cvb ${Experts.urgent().length ? 'alert' : ''}" data-act="experts" ${S.pendingEvent ? 'disabled' : ''} title="Ask economists, the central bank, the IMF, business and unions what to do"><span>🧠</span>Experts<small>${Experts.urgent().length ? Experts.urgent().length + ' issue' + (Experts.urgent().length > 1 ? 's' : '') : 'advice'}</small></button>
+    <button class="cvb" data-act="buildPick" ${S.pendingEvent ? 'disabled' : ''}><span>🏗️</span>Build<small>tender in ${reg(UI.region).short}</small></button>
+    <button class="cvb" data-act="tab" data-id="laws" data-scroll="1"><span>📜</span>Bill<small>draft a law</small></button>
+    <button class="cvb" data-act="speechPick" ${S.pc < 1 || S.pendingEvent ? 'disabled' : ''}><span>🎤</span>Speech<small>⭐1</small></button>
+    <button class="cvb" data-act="foreign" ${S.pendingEvent ? 'disabled' : ''}><span>✈️</span>Foreign<small>${S.tripTurn === S.turn ? 'trip done' : 'UN · summits · visits'}</small></button>
     <button class="cvb" data-act="tab" data-id="parl" data-scroll="1"><span>🏛️</span>Parliament<small>${coalitionSeats()}/${S.parl.size || 100}</small></button>
     <button class="cvb" data-act="tab" data-id="defense" data-scroll="1"><span>🛡️</span>Defense<small>risk ${warRisk()[0].toLowerCase()}</small></button>
     <button class="btn primary cvb-end" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish →' : 'End term →') : 'End half-year →'}</button></div>`;
@@ -1329,8 +1363,8 @@ function cityCard() {
   const office = !camp && UI.view === 'office';
   const title = office ? `<b>🏛️ Office of the ${ROLE.title}</b><span class="muted small">${myFlag()} ${esc(S.country)} · ${turnLabel()} · approval ${fmt(approval())}%</span>`
     : `<b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${fmt(people, 1)}M people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span>`;
-  return `<div class="card citycard ${UI.pin !== false ? 'pin' : ''}">
-    <div class="cv-head"><div class="cv-title">${title}</div><button class="pinbtn" data-act="pin" title="Keep the animation pinned at the top">${UI.pin !== false ? '📌' : '📍'}</button>
+  return `<div class="card citycard ${UI.pin !== false ? 'pin' : ''} ${UI.mini ? 'mini' : ''}">
+    <div class="cv-head"><div class="cv-title">${title}</div><button class="pinbtn" data-act="mini" title="${UI.mini ? 'Show' : 'Hide'} the animated scene">${UI.mini ? '🔽' : '🔼'}</button><button class="pinbtn" data-act="pin" title="Keep the panel pinned at the top">${UI.pin !== false ? '📌' : '📍'}</button>
       <div class="moods">${GK.filter(g => r.mix[g] > 0).map(moodChip).join('')}</div>${regionPicker()}</div>
     <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">${office ? 'your office · aides bring papers · the TV shows the latest news' : 'drag to explore · hover people &amp; buildings'}</div></div>
     ${cityBar(camp)}
@@ -1451,6 +1485,9 @@ const ACT = {
   speech: d => speech(d.g),
   tender: d => startTender(d.id),
   finAct: d => Money.decide(d.id),
+  experts: d => Experts.open(d.id),
+  speed: d => { UI.speed = +d.id; paintClock(); },
+  mini: () => { UI.mini = !UI.mini; render(); },
   manifesto: () => Manifesto.campaignDoc(),
   housePrice: d => { S.housing.price = d.id; save(); render(); },
   buildHousing: () => { UI.tab = 'build'; render(); startTender('housing'); },

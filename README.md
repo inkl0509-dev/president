@@ -64,6 +64,16 @@ Edit `COUNTRIES` in `data.js` to add more countries.
 - **Opening ceremonies**: when a project is finished, the city view shows a ribbon-cutting ceremony.
 - Flags are drawn in SVG so they also display on Windows (which has no emoji flags).
 
+## Game clock & experts
+
+- **Clock**: while governing, game time runs — **2 real minutes = 1 month**, so a half-year lasts 12 minutes and ends
+  automatically after June / December. ⏸ pause, ▶ normal, ⏩ fast (40 s a month). The clock stops while a dialog is open.
+  **End half-year →** still ends it at once.
+- **🧠 Ask the experts**: a policy roundtable on the current problem (deficit, debt, inflation, jobs, dollar reserves,
+  approval). The chief economist, central-bank governor, an IMF mission chief, the chamber of commerce, a union leader and
+  the opposition each give their view and recommend options; every option shows pros, cons and its effect before you decide.
+- The pinned top panel is compact (smaller scene and buttons); 🔼 hides the scene and keeps only the action bar.
+
 ## Manifesto, money & banks
 
 - **📜 Manifesto tab**: every promise and development pledge with *what to do* (step by step), *the effect when kept*,
@@ -141,6 +151,7 @@ gov.js            bills, procurement, cabinet, newspaper, world economy
 scenes.js         flags, office, speeches, UN, summits, state visits, cabinet room
 money.js          central banks, banks, taxes, reserves, financing decisions
 agenda.js         manifesto & delivery tracker
+experts.js        expert policy roundtable
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured
 firestore.rules   security rules for the leaderboard
