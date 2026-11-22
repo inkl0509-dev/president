@@ -782,8 +782,10 @@ async function turnStart() {
     ev = GOV_EVENTS.find(e => e.id === id) || pick(GOV_EVENTS);
   }
   const k = await choiceModal({ ...ev, text: ev.text.replace(/\{NEIGHBOR\}/g, NEIGHBOR), mode: 'gov' });
+  const before = Impact.snap();
   applyGovFx(ev.choices[k].fx); news(ev.choices[k].news || ev.title);
   S.pendingEvent = false; save(); render();
+  Impact.show(`${ev.title}: ${ev.choices[k].t.replace(/<[^>]+>/g, '').slice(0, 60)}`, before, { lesson: 'Events test leaders. Every choice has winners and losers — the art is deciding who must be protected and explaining why.' });
 }
 function advisorTip() {
   const lowG = [...GK].sort((a, b) => S.ga[a] - S.ga[b])[0];
@@ -841,6 +843,7 @@ async function impeachment(ap) {
 }
 function proposeLaw(id) { return Legis.run(id); }
 function applyLawPassed(L, k = 1) {
+  const before = Impact.snap();
   S.laws.push(L.id);
   for (const g in L.g) { S.lawMods[g] += L.g[g] * k; S.ga[g] = clamp(S.ga[g] + L.g[g] * .5 * k); }
   for (const st in L.s) { S.lawStat[st] += L.s[st] * k; S.stats[st] = clamp(S.stats[st] + L.s[st] * .3 * k); }
@@ -850,6 +853,7 @@ function applyLawPassed(L, k = 1) {
     S.parl.coalition = S.parl.coalition.filter(x => x !== pid);
     news(`${partyById(pid).name} quits coalition in protest over ${L.name}`); toast(`${partyById(pid).name} left your coalition!`, 'bad');
   });
+  setTimeout(() => Impact.show(`${L.name} becomes law`, before, { fx: { g: L.g, s: L.s }, expected: L.cost ? `Costs about ${fmt(L.cost * k * 2, 1)}% of GDP a year.` : '', lesson: 'Laws change behaviour slowly: their full effect builds up over the following half-years, while the cost starts at once.' }), 600);
   const pg = GK.find(g => PROMISES[g].law === L.id && S.promises.some(p => p.g === g));
   if (pg) { S.ga[pg] = clamp(S.ga[pg] + 5); S.eventMods[pg] += 4; toast(`Promise kept! ${GROUPS[pg].name} are delighted.`, 'good'); say('A promise made is a promise kept!'); }
   else say(`The ${L.name} is now law!`);
@@ -1240,8 +1244,9 @@ function housingHTML() {
 }
 function lawsHTML() {
   const promisedLaws = S.promises.map(p => PROMISES[p.g].law);
-  return `<p class="muted small">One bill per half-year. ⭐ ${S.pc} political capital. ${majority()} of ${S.parl.size || 100} votes needed — see the 🏛️ Parliament tab.</p>
-  <div class="laws">${LAWS.map(L => {
+  return `<div class="dr-cta"><div><b>✍️ Write your own bill</b><small>Choose what the law does; your assistant helps you draft it, estimates the cost and counts the votes.</small></div><button class="btn primary" data-act="draftBill" ${S.lawThisTurn || S.pendingEvent ? 'disabled' : ''}>Open drafting studio</button></div>
+  <p class="muted small">One bill per half-year. ⭐ ${S.pc} political capital. ${majority()} of ${S.parl.size || 100} votes needed — see the 🏛️ Parliament tab.</p>
+  <div class="laws">${LAWS.filter(L => !L.custom || (S.customLaws || []).some(c => c.law.id === L.id)).map(L => {
     const passed = S.laws.includes(L.id), can = !passed && !S.lawThisTurn && S.pc >= L.pc && !S.pendingEvent;
     const ey = passed ? 0 : expectedYes(L);
     const fx = { g: L.g, s: L.s, cost: L.cost };
@@ -1289,7 +1294,7 @@ function defenseHTML() {
   <p class="muted small">Equipment ages: every branch loses 1 point each half-year. Upkeep is paid from the budget. If the threat is much bigger than your strength, the ${NEIGHBOR} may invade.</p>`;
 }
 function peopleHTML() {
-  return `<p class="muted small">A speech costs ⭐1 and gives a quick boost.</p>${GK.map(g => {
+  return `${Impact.feed()}<p class="muted small">A speech costs ⭐1 and gives a quick boost.</p>${GK.map(g => {
     const v = S.ga[g], d = S.gaPrev ? v - S.gaPrev[g] : 0;
     return `<div class="grp"><span class="gname">${GROUPS[g].icon} ${GROUPS[g].name} <small class="muted">${Math.round(NAT[g] * 100)}% of voters</small></span>
       <div class="bar"><div style="width:${v}%;background:${approvalColor(v)}"></div></div><b>${fmt(v)}%</b><em class="${d >= 0 ? 'up' : 'down'}">${Math.abs(d) >= .5 ? sign(d, 0) : ''}</em>
@@ -1381,7 +1386,7 @@ const TABS = [['agenda', '📜 Manifesto'], ['team', '👥 Government'], ['money
 function renderGovern() {
   const ap = approval(), pp = partyById(S.player.party), inTerm = (S.turn - 1) % TT() + 1;
   const tabHTML = { team: () => Team.html(), agenda: () => Manifesto.html(), money: () => Money.html(), budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
-  return `${cityCard()}<div class="grid3 gov">
+  return `${cityCard()}${Assistant.card()}<div class="grid3 gov">
     <div class="card leader">
       <div class="portrait">${bubble()}${avatarSVG(S.player.look, mood(), 110, 'float')}</div>
       <h2>${esc(S.player.name)}</h2><div class="muted">${ROLE.title} of ${myFlag()} ${esc(S.country)}</div>
@@ -1476,6 +1481,10 @@ const ACT = {
   hall: () => { UI.screen = 'hall'; render(); loadCloud(); },
   online: () => Online.open(),
   install: () => PWA.install(),
+  cosToggle: () => { UI.cosOpen = UI.cosOpen === false; render(); },
+  assistOff: () => Assistant.set(false),
+  loans: () => Loans.discuss(),
+  draftBill: () => Drafter.open(),
   setParty: d => { UI.setup.party = d.id; render(); },
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
@@ -1517,9 +1526,11 @@ function openMenu() {
   const m = modal(`<div class="m-icon">☰</div><h2>Menu</h2><div class="choices">
     <button class="choice" id="mn-resume"><b>▶ Resume</b></button>
     <button class="choice" id="mn-title"><b>🏠 Save & go to title screen</b></button>
+    <button class="choice" id="mn-assist"><b>🧭 Assistant mode: ${Assistant.on() ? 'ON' : 'OFF'}</b><span class="fx">${Assistant.on() ? 'Tap to hide the Chief of Staff and all guidance' : 'Tap to get step-by-step guidance on running the country'}</span></button>
     ${PWA.canShow() ? '<button class="choice" id="mn-inst"><b>📲 Install as an app</b><span class="fx">Home-screen icon, full screen, works offline</span></button>' : ''}
     ${S && S.phase !== 'over' ? '<button class="choice" id="mn-quit"><b>🗑️ Abandon this game</b><span class="fx">Deletes your saved progress</span></button>' : ''}</div>`);
   $('#mn-resume', m).onclick = closeModal;
+  $('#mn-assist', m).onclick = () => { closeModal(); Assistant.set(!Assistant.on()); };
   const ins = $('#mn-inst', m); if (ins) ins.onclick = () => { closeModal(); PWA.install(); };
   $('#mn-title', m).onclick = () => { closeModal(); save(); UI.screen = 'title'; render(); };
   const q = $('#mn-quit', m);
@@ -1528,6 +1539,7 @@ function openMenu() {
 function resume() {
   UI.walkFrom = null; UI.speech = 'Welcome back!';
   applyCountry(S.countryId || 'veloria');
+  Drafter.register();
   if (!S.scale) S.scale = 1; if (!S.termTurns) S.termTurns = 8; if (!S.maxTerms) S.maxTerms = 2;
   if (S.stats && S.infl === undefined) World.init();
   if (S.stats) initGovExtras();
@@ -1559,6 +1571,18 @@ document.addEventListener('input', e => {
     save();
   }
 });
+// budget sliders: show the expected impact when the slider is released
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.budget || !S || !S.budget) return;
+  const k = t.dataset.budget, v = +t.value, old = UI.budgetWas && UI.budgetWas[k] !== undefined ? UI.budgetWas[k] : v;
+  UI.budgetWas = { ...S.budget }; if (v === old) return;
+  const up = v > old, d = Math.abs(v - old);
+  const FX = { tax: { g: { business: up ? -3 : 3, workers: up ? -1 : 1 }, s: { economy: up ? -1 : 1 } }, health: { g: { elderly: up ? 2 : -2 }, s: { health: up ? 2 : -2 } }, education: { g: { youth: up ? 2 : -2 }, s: { education: up ? 2 : -2 } },
+    security: { g: { elderly: up ? 1 : -1, youth: up ? -1 : 1 }, s: { security: up ? 2 : -2 } }, infra: { g: { farmers: up ? 2 : -2 }, s: { economy: up ? 1 : -1 } }, welfare: { g: { workers: up ? 2 : -2, elderly: up ? 2 : -2 } } }[k];
+  const money1 = k === 'tax' ? `Revenue ${up ? '+' : '−'}${fmt(d, 0)}% of GDP a year` : `Spending ${up ? '+' : '−'}${fmt(d, 0)}% of GDP a year`;
+  Impact.show(`Budget: ${k === 'tax' ? 'tax rate' : k} ${up ? '▲' : '▼'} to ${v}${k === 'tax' ? '%' : ''}`, null, { fx: FX, expected: `${money1}, so the deficit ${(k === 'tax') === up ? 'falls' : 'rises'}.`, when: 'from this half-year', lesson: 'Budget changes act slowly on services (a new hospital budget takes time to show) but at once on the deficit.' });
+});
+['focusin', 'pointerdown'].forEach(ev => document.addEventListener(ev, e => { if (e.target.dataset && e.target.dataset.budget && S && S.budget) UI.budgetWas = { ...S.budget }; }));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').classList.contains('open') && $('#pk-x')) $('#pk-x').click(); });
 
 // ---------- boot ----------

@@ -170,7 +170,8 @@ const Money = (() => {
       [{ id: 'go', label: `Approve ${A.pc ? '⭐' + A.pc : ''}`, primary: true, disabled: !can }, { id: 'no', label: 'Not now' }]);
     if (ch !== 'go') return;
     S.pc -= A.pc; if (S.fin.done.turn !== S.turn) S.fin.done = { turn: S.turn, ids: [] }; S.fin.done.ids.push(id);
-    const [msg, cls] = A.run(); toast(msg, cls === 'bad' ? 'bad' : 'good');
+    const before = Impact.snap(), [msg, cls] = A.run(); toast(msg, cls === 'bad' ? 'bad' : 'good');
+    if (cls !== 'bad') setTimeout(() => Impact.show(A.title(), before, { expected: A.fx, lesson: A.edu }), 200);
     (S.agenda = S.agenda || []).push({ turn: S.turn, min: 'finance', label: A.title(), kind: 'money', result: msg });
     save(); render();
   }
@@ -198,6 +199,7 @@ const Money = (() => {
       <div class="cb-card"><div class="cb-h">🏦 <div><b>${f.cb}</b><small>${f.since ? `Founded ${f.since} · ` : ''}${f.cur}</small></div></div>
         <p class="small">${f.regimeText}.${f.tools ? `<br><span class="muted">Tools: ${f.tools}</span>` : ''}</p></div>
       ${top}<button class="btn small" data-act="experts" data-id="${peg() ? 'fx' : 'deficit'}">🧠 Ask the experts what to do</button>${cal}
+      <h3>💳 Loans <button class="btn small" data-act="loans">Discuss a loan with ministers</button></h3>${Loans.table()}
       <h3>🧾 Financing decisions</h3><p class="muted small">Proposals from the Minister of Finance. Each shows what happens before you approve.</p>
       <div class="choices tight">${acts || '<p class="muted small">No financing decisions available.</p>'}</div>
       ${f.taxes ? `<h3>💰 Taxes <small class="muted">collected by ${f.taxAuth}</small></h3><table class="fin-t">${f.taxes.map(([k, v], i) => `<tr><td>${k}</td><td>${i === 1 && fin.tgst !== 17 ? `<b>${fin.tgst}%</b> (game)` : i === 2 && fin.green !== 12 ? `<b>$${fin.green}</b> a night (game)` : v}</td></tr>`).join('')}</table>` : ''}

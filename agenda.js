@@ -98,8 +98,8 @@ const Manifesto = (() => {
       <div class="mtitle">${myFlag()} <div><b>Presidential Manifesto</b><small>${esc(S.player.name)} · ${partyById(S.player.party).name} · ${esc(S.country)}</small></div>
         <div class="mscore"><b>${kept}/${total}</b><small>pledges kept</small></div></div>
       ${bar(total ? kept / total : 0)}
-      <h3>▶ What to do next <small class="muted">${ns.left} half-year${ns.left === 1 ? '' : 's'} left in this term</small></h3>
-      <div class="next">${ns.list.length ? ns.list.map(([i, t, b]) => `<div class="nx"><span>${i}</span><p>${t}</p>${b}</div>`).join('') : '<p class="muted small">Everything is on track. 👏</p>'}</div>
+      ${Assistant.on() ? `<h3>▶ What to do next <small class="muted">${ns.left} half-year${ns.left === 1 ? '' : 's'} left in this term</small></h3>
+      <div class="next">${ns.list.length ? ns.list.map(([i, t, b]) => `<div class="nx"><span>${i}</span><p>${t}</p>${b}</div>`).join('') : '<p class="muted small">Everything is on track. 👏</p>'}</div>` : ''}
       <h3>📜 Pledges</h3>
       ${total ? [...pr.map(lawCard), ...dv.map(devCard)].join('') : '<p class="muted small">You made no pledges. Next campaign, use 🤝 Promise and 📜 Manifesto to win votes — then deliver them here.</p>'}
       <h3>👔 Cabinet decisions & projects</h3>

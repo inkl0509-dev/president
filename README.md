@@ -64,6 +64,22 @@ Edit `COUNTRIES` in `data.js` to add more countries.
 - **Opening ceremonies**: when a project is finished, the city view shows a ribbon-cutting ceremony.
 - Flags are drawn in SVG so they also display on Windows (which has no emoji flags).
 
+## Learning to govern
+
+- **📊 Impact of every decision**: laws, budget changes, tenders, loans, expert options, cabinet advice and events each show
+  what changed right away, what is expected later, and **what people say** (citizens' reactions by group, age, job and island).
+- **📰 The newspaper** now has journalists with bylines (political, economics, foreign desk, atolls), a *Decisions & reactions*
+  story with quotes from the government and the opposition, and a vox pop from around the country.
+- **🧭 Assistant mode** (☰ menu): a Chief of Staff suggests what to do next and teaches one lesson on how to run a country
+  each half-year. Turn it off and all guidance disappears.
+- **💳 Loans in cabinet**: in a cabinet meeting, discuss bank loans — local banks, foreign commercial banks, World Bank/ADB,
+  India EXIM, China EXIM, IsDB/Saudi Fund (Maldives) — with the ministers' views, then choose the amount and purpose.
+- **✍️ Write your own bill** (Laws tab): choose the area, title, purpose, clauses, funding and phase-in; the assistant checks
+  cost, winners and losers and expected votes; then the bill goes through parliament.
+- **🔍 Full tender review**: after bid opening you can check every bidder's documents yourself (bid security, registration,
+  tax clearance, accounts, experience, staff, method, ownership), verify suspicious ones by phone, correct arithmetic
+  errors, score the technical proposals, and get graded by the auditor. Mistakes lead to protests or scandals.
+
 ## Install on a phone (PWA)
 
 The game is a Progressive Web App: on your own site (e.g. Vercel, which serves HTTPS) players can install it.
@@ -186,6 +202,11 @@ team.js           ministers & SOE managing directors
 net.js            storage adapter (Claude page db or Firebase)
 online.js         online multiplayer: lobby, election, posts, proposals, opposition
 pwa.js, sw.js     install as an app, offline cache
+impact.js         decision impacts & public opinion
+assistant.js      Chief of Staff guidance (assistant mode)
+loans.js          loan discussion in cabinet
+drafter.js        write your own bill
+tender.js         full tender document review & evaluation
 manifest.webmanifest, icons/  app name and icons
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured

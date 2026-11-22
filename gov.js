@@ -173,6 +173,20 @@ const Paper = (() => {
   const short = () => S.country.replace(/^Republic of /, '');
   const paperName = () => (S.paper = S.paper || pick(COUNTRY.id === 'mv' ? ['The Raajje Herald', 'Dhivehi Raajje Daily', 'The Maalé Tribune'] : [`The ${short()} Herald`, `${short()} Daily News`, `The ${short()} Tribune`, `The ${short()} Times`]));
   const annual = g => ((1 + g / 100) ** 2 - 1) * 100;
+  function journalists() {
+    if (!S.press) {
+      const beats = ['Political Correspondent', 'Economics Editor', 'Foreign Desk', COUNTRY.id === 'mv' ? 'Atolls Correspondent' : 'Regional Correspondent'];
+      S.press = beats.map(beat => ({ name: personName(Math.random() < .5 ? 'f' : 'm'), beat }));
+    }
+    return S.press;
+  }
+  const by = j => `<div class="p-by">By <b>${esc(j.name)}</b>, ${esc(j.beat)}</div>`;
+  function oppQuote() {
+    return `${S.opp.name}, leader of the opposition ${partyById(S.opp.party).name}, said: “${pick(['This government makes headlines, not progress.', 'Ordinary families will pay the price for these decisions.', 'We will hold the government to account in parliament.', 'Where is the money coming from? The people deserve answers.'])}”`;
+  }
+  function govQuote() {
+    return `A spokesperson for the ${ROLE.title}'s Office said: “${pick(['These are difficult but necessary decisions for our future.', 'The government is delivering on its promises.', 'We listened to experts and to the people before deciding.', 'Results will speak louder than criticism.'])}”`;
+  }
   function chg(now, before, d = 1, suffix = '', lowerIsGood = false) { const c = now - before; return `<em class="${(c >= 0) !== lowerIsGood ? 'up' : 'down'}">${c >= 0 ? '▲' : '▼'} ${Math.abs(c).toFixed(d)}${suffix}</em>`; }
   function show(r, a0, a1, w) {
     const g = annual(r.growth), opened = r.msgs.filter(m => m.startsWith('✅'));
@@ -200,15 +214,24 @@ const Paper = (() => {
     const poll = `<div class="p-box"><div class="p-kicker">🗳️ Opinion poll</div>${GK.map(g2 => `<div class="p-poll"><span>${GROUPS[g2].icon} ${GROUPS[g2].name}</span><div class="bar"><div style="width:${S.ga[g2]}%;background:${approvalColor(S.ga[g2])}"></div></div><b>${fmt(S.ga[g2])}%</b></div>`).join('')}
       <div class="p-poll total"><span>Overall</span><b>${fmt(a0)}% → ${fmt(a1)}%</b></div></div>`;
     const brief = [...r.msgs, ...S.news.slice(0, 4).filter(n => !r.msgs.includes(n))].slice(0, 7);
+    const P = journalists();
+    const decs = (S.decLog || []).filter(d => !d.pub).slice(0, 4); (S.decLog || []).forEach(d => d.pub = true);
+    const decSec = decs.length ? `<div class="p-sec"><div class="p-kicker">🏛️ Decisions & reactions</div>${by(P[0])}
+      ${decs.map(d => `<div class="p-dec"><h4>${esc(d.title)}</h4>${d.rows.length ? `<p class="p-small">${esc(d.rows.join(' · '))}</p>` : ''}${d.voices.slice(0, 1).map(v => `<p>“${esc(v.text)}” said ${esc(v.who)}.</p>`).join('')}</div>`).join('')}
+      <p>${govQuote()}</p><p>${oppQuote()}</p></div>` : '';
+    const movers = GK.map(g => [g, S.ga[g] - ((S.gaPrev || S.ga)[g])]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3);
+    const vox = movers.map(([g, d]) => Impact.voice(g, d >= 0 ? 1 : -1, 'the last six months'));
+    const voxBox = `<div class="p-box p-vox"><div class="p-kicker">🎙️ Vox pop</div><div class="p-small">We asked people around the country how the last six months went.</div>${by(P[3])}
+      ${vox.map(v => `<p>“${esc(v.text)}”<br><small>— ${esc(v.who)}</small></p>`).join('')}</div>`;
     return new Promise(res => {
       const m = modal(`<div class="paper">
         <div class="p-mast"><div class="p-name">${esc(paperName())}</div><div class="p-date">${myFlag()} ${esc(S.country)} · ${turnLabel()} · ${yearNow()} edition</div></div>
         <div class="p-head">${esc(head)}</div><div class="p-sub">${esc(sub)}</div>
         <div class="p-cols">
-          <div class="p-main"><p class="p-lead">${lead}</p>${world}
+          <div class="p-main">${by(P[1])}<p class="p-lead">${lead}</p>${decSec}${world.replace('<div class="p-kicker">🌍 World</div>', `<div class="p-kicker">🌍 World</div>${by(P[2])}`)}
             ${brief.length ? `<div class="p-sec"><div class="p-kicker">🗞️ In brief</div><ul>${brief.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>` : ''}
-            <div class="p-sec p-edit"><div class="p-kicker">✍️ Editorial</div><p>${advisorTip().replace('🧑‍💼 Advisor: ', '')}</p></div></div>
-          <div class="p-side">${markets}${poll}</div>
+            <div class="p-sec p-edit"><div class="p-kicker">✍️ Editorial — the view of ${esc(paperName())}</div><p>${advisorTip().replace('🧑‍💼 Advisor: ', '')}</p></div></div>
+          <div class="p-side">${markets}${poll}${voxBox}</div>
         </div>
         <div class="center"><button class="btn primary big" id="p-ok">Continue</button></div></div>`, 'paper-card');
       m.querySelector('.modal-card').scrollTop = 0;
@@ -404,7 +427,7 @@ const Cabinet = (() => {
             <div class="cab-list">${list.map(b => { const mi = get(b.id); return `<div class="cab ${b.st}"><div class="cab-h">${avatarSVG(mi.look, b.st === 'red' ? -1 : b.st === 'green' ? 1 : 0, 46)}<div><b>${mi.icon} ${esc(mi.name)}</b><small>${esc(mi.title)}${mi.party !== S.player.party ? ` · <span style="color:${partyById(mi.party).color}">${partyById(mi.party).name}</span>` : ''}</small></div><span class="dot ${b.st}"></span></div>
               <p>${b.text}</p><details><summary>📘 Why it matters</summary><p>${b.learn}</p></details>
               <div class="cab-acts">${done.includes(b.id) ? '<span class="good small">✓ Advice adopted</span>' : b.acts.map((a, j) => `<button class="btn small" data-b="${b.id}" data-j="${j}">${a.label}</button>`).join('') || '<span class="muted small">No action needed.</span>'}</div></div>`; }).join('')}</div>
-            <div class="center"><button class="btn primary big" id="cab-x">End meeting</button></div>`, 'cab-card');
+            <div class="center cab-end"><button class="btn big" id="cab-loan">💳 Discuss bank loans & financing</button><button class="btn primary big" id="cab-x">End meeting</button></div>`, 'cab-card');
           let speaker = list[0] && list[0].id, spoke = 0;
           const lineOf = id => { const b2 = list.find(x => x.id === id); return b2 ? b2.text.replace(/<[^>]+>/g, '').split('. ')[0] + '.' : ''; };
           Scenes.modal.attach($('#cab-cv', m), 'cabinet', { ministers: S.cabinet, speaker: () => speaker, line: () => lineOf(speaker) }, 260);
@@ -412,19 +435,22 @@ const Cabinet = (() => {
           m.querySelectorAll('.cab').forEach((el, i) => el.onmouseenter = () => { speaker = list[i].id; });
           m.querySelectorAll('[data-b]').forEach(btn => btn.onclick = () => {
             const b = list.find(x => x.id === btn.dataset.b), a = b.acts[+btn.dataset.j];
-            const r = a.fn(); done.push(b.id);
+            const before = Impact.snap(), r = a.fn(); done.push(b.id);
             (S.agenda = S.agenda || []).push({ turn: S.turn, min: b.id, label: a.label.replace(/\s*\(.*\)$/, ''), law: r && r.law, tender: r && r.tender, base: r && r.tender ? count(r.tender) : undefined });
             news(`Cabinet adopts ${get(b.id).title.toLowerCase()}'s proposal: ${a.label.replace(/\(.*\)/, '').trim()}`);
             toast(`Adopted: ${a.label}`, 'good'); save();
+            if (!(r && (r.law || r.tender || r.tab))) setTimeout(() => Impact.show(`Cabinet: ${a.label.replace(/\s*\(.*\)$/, '')}`, before, { lesson: 'Ministers know their sectors best, but each one argues for their own budget. The president\'s job is to weigh their advice against the whole picture.' }), 300);
             if (r && (r.law || r.tender || r.tab)) { follow = r; closeModal(); res(); return; }
             draw();
           });
           $('#cab-x', m).onclick = () => { closeModal(); res(); };
+          $('#cab-loan', m).onclick = () => { follow = { loans: true }; closeModal(); res(); };
         };
         draw();
       });
       render();
       UI.busy = false;
+      if (follow && follow.loans) { await Loans.discuss(); }
       if (follow && follow.tab) { UI.tab = follow.tab; render(); }
       if (follow && follow.law) { UI.tab = 'laws'; render(); await Legis.run(follow.law); }
       if (follow && follow.tender) await Procure.run(follow.tender);
@@ -486,18 +512,19 @@ const Procure = (() => {
         const docs = c.shady ? Math.random() < .6 : Math.random() < .95;
         return { c, q, price, turns, docs };
       });
-      await docModal(`${stepsBar(STEPS, 2)}<h2>📬 Public bid opening</h2>
+      const howEval = await docModal(`${stepsBar(STEPS, 2)}<h2>📬 Public bid opening</h2>
         <p class="m-body">Sealed envelopes are opened in front of bidders' representatives and an independent observer. Prices are read aloud and recorded in the minutes.</p>
         <table class="bidtable"><tr><th>Bidder</th><th>Bid price</th><th>vs estimate</th><th>Completion</th><th>Bid security</th><th>Documents</th></tr>
         ${bids.map(b => `<tr><td>${b.c.icon} ${b.c.name} <span class="tag-c ${b.c.tag.toLowerCase()}">${b.c.tag}</span></td><td><b>${money(b.price)}</b></td><td class="${b.price > est * 1.05 ? 'bad' : b.price < est * .85 ? 'warn' : 'good'}">${sign((b.price / est - 1) * 100, 0)}%</td><td>${b.turns * 6} months</td><td class="good">✓</td><td class="${b.docs ? 'good' : 'bad'}">${b.docs ? '✓ complete' : '✗ incomplete'}</td></tr>`).join('')}</table>
         ${edu('Public bid opening prevents prices from being changed after the deadline. Bids that are far below the estimate ("abnormally low tenders") are checked carefully — they often lead to delays or claims for extra money later.')}`,
-        [{ id: 'go', label: '📋 Send to evaluation committee', primary: true }]);
+        [{ id: 'self', label: '🔍 Check the documents & evaluate myself (full process)', primary: true }, { id: 'go', label: '📋 Let the evaluation committee do it' }]);
+      const review = howEval === 'self' ? await TenderReview.run(bids, est, P, r, ref, STEPS) : null;
       // 4. evaluation
       const board = [
         { role: 'Chair (Deputy Minister)', g: 'm' }, { role: 'Civil engineer — technical', g: 'f' }, { role: 'Financial analyst', g: 'm' },
         { role: 'Legal & compliance officer', g: 'f' }, { role: 'Independent observer (anti-corruption)', g: Math.random() < .5 ? 'f' : 'm' },
       ].map(b => ({ ...b, name: personName(b.g) }));
-      bids.forEach(b => {
+      if (!review) bids.forEach(b => {
         b.flags = [];
         if (b.c.shady) b.flags.push('Beneficial owners not disclosed; director linked to a past bid-rigging case');
         if (!b.docs) b.flags.push('Missing mandatory documents');
@@ -536,6 +563,12 @@ const Procure = (() => {
       // 5. award & protest
       let protest = '';
       const second = ranked.find(b => b !== chosen && b.ok);
+      const wronged = bids.find(b => b.wronged && b !== chosen);
+      if (wronged && Math.random() < .7) {
+        protest = `<div class="protest bad"><b>⚠️ Bid protest:</b> ${wronged.c.name} complained to the Public Procurement Review Board that its bid was rejected for no valid reason. <b>Complaint upheld</b> — the board orders a re-evaluation and awards the contract to ${wronged.c.name}.</div>`;
+        GK.forEach(g => S.ga[g] = clamp(S.ga[g] - 1)); news(`Review board upholds complaint by ${wronged.c.name} on tender ${ref}`);
+        wronged.ok = true; return finish(wronged, true, protest);
+      }
       if (second && (override || (rec && second.total > rec.total - 3)) && Math.random() < (override ? .7 : .3)) {
         const upheld = override && Math.random() < .6;
         protest = `<div class="protest ${upheld ? 'bad' : ''}"><b>⚠️ Bid protest:</b> ${second.c.name} filed a complaint with the Public Procurement Review Board during the 10-day standstill period. ${upheld ? `<b>Complaint upheld</b> — the board found the award did not follow the published criteria. The contract goes to ${rec ? rec.c.name : second.c.name} and the press calls it a scandal.` : '<b>Complaint dismissed</b> — the board found the evaluation followed the rules.'}</div>`;
@@ -586,6 +619,8 @@ const Procure = (() => {
     const P = PROJECTS[type], r = reg(rid);
     S.debt += b.price * .15;
     S.projects.push({ uid: Date.now() + Math.random(), type, region: rid, company: b.c.id, turnsLeft: b.turns, total: b.turns, q: b.q, price: b.price, delays: 0, paid: .15, ref });
+    const loanTxt = S.loanFor && S.loanFor.type === type && S.turn <= S.loanFor.until ? ` Financed by the ${S.loanFor.lender} loan.` : '';
+    setTimeout(() => Impact.show(`Contract signed: ${PROJECTS[type].name} in ${reg(rid).short}`, null, { fx: PROJECTS[type].fx, when: `when it opens (about ${b.turns} half-year${b.turns > 1 ? 's' : ''})`, expected: `${b.c.name} builds it for ${money(b.price)}, paid in stages as work is certified.${loanTxt}`, lesson: 'Big projects create jobs during construction and benefits for decades after — if they are built well. Watch for delays and cost overruns.' }), 400);
     if (b.c.tag === 'Foreign') { S.eventMods.business += 1; S.eventMods.workers -= 1.5; }
     if (b.c.tag === 'State') S.eventMods.workers += 1;
     news(`${b.c.name} signs ${money(b.price)} contract for ${P.name} in ${r.name}`);

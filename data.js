@@ -442,7 +442,7 @@ const COMPANY_LOCAL = {
     volt:  { name: 'STELCO — State Electric Company', icon: '⚡', tag: 'State', spec: ['solar', 'coal'] },
     nat:   { name: 'MTCC — Maldives Transport & Contracting Co.', icon: '⛴️', tag: 'State' },
     orion: { name: 'CCCC — China Communications Construction', icon: '🌍', tag: 'Foreign' },
-    medi:  { name: 'Atoll MediBuild (fictional)' }, iron: { name: 'Coastguard Works (fictional)' },
+    medi:  { name: 'Atoll MediBuild' }, iron: { name: 'Coastguard Works' },
   },
 };
 

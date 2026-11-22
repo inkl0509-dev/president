@@ -207,7 +207,7 @@ const Experts = (() => {
     if (o.money) { UI.tab = 'money'; render(); return Money.decide(o.money); }
     if (S.pc < o.pc) return;
     S.pc -= o.pc;
-    const msg = o.run();
+    const before = Impact.snap(), msg = o.run();
     if (!S.expertDone || S.expertDone.turn !== S.turn) S.expertDone = { turn: S.turn, ids: [] };
     S.expertDone.ids.push(k);
     const fail = msg.startsWith('✗');
@@ -215,6 +215,7 @@ const Experts = (() => {
     toast(msg.replace('✗ ', ''), fail ? 'bad' : 'good');
     if (!fail) (S.agenda = S.agenda || []).push({ turn: S.turn, min: 'finance', label: o.t(), kind: 'expert', result: msg, issue: cur.name });
     save(); render();
+    if (!fail) Impact.show(o.t(), before, { expected: val(o.pros) + ' — but ' + val(o.cons).replace(/^./, c => c.toLowerCase()), lesson: 'Every policy has trade-offs. Experts disagree because they weigh the winners and losers differently.' });
     if (o.after && !fail) await o.after();
   }
   return { open, urgent, defPct };
