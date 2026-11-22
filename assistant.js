@@ -48,7 +48,7 @@ const Assistant = (() => {
       <div class="cos-h"><div class="cos-av">${avatarSVG(c.look, 1, 40)}</div><div><b>🧭 ${esc(c.name)}</b><small>Chief of Staff · assistant mode</small></div>
         <button class="btn small ghost" data-act="cosToggle">${open ? 'Hide' : 'Show'}</button><button class="btn small ghost" data-act="assistOff" title="Turn assistant mode off">Turn off</button></div>
       ${open ? `<div class="cos-b"><div class="cos-next"><div class="lbl">What to do next</div>${steps().map(([i, t, b]) => `<div class="nx"><span>${i}</span><p>${t}</p>${b}</div>`).join('')}</div>
-        <div class="cos-lesson"><div class="lbl">📘 How to run a country — ${L[0]}</div><p>${L[1]}</p></div></div>` : ''}
+        <div class="cos-lesson"><div class="lbl">📘 How to run a country — ${L[0]}</div><p>${L[1]}</p><button class="btn small" data-act="school">📘 Finance School lessons</button></div></div>` : ''}
     </div>`;
   }
   return { on, set, card, steps };

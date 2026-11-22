@@ -64,6 +64,29 @@ Edit `COUNTRIES` in `data.js` to add more countries.
 - **Opening ceremonies**: when a project is finished, the city view shows a ribbon-cutting ceremony.
 - Flags are drawn in SVG so they also display on Windows (which has no emoji flags).
 
+## 📘 Finance School, T-bills and swaps (the game is meant to teach)
+
+- **Finance School** (title screen, ☰ menu, 🏦 Money tab): 9 short lessons with diagrams — budget & debt, Treasury bills,
+  bonds & sukuk, currency swaps, reserves & the peg, the central bank, inflation, IMF & development loans, debt
+  sustainability — each with a 3-question quiz. Pass to earn a badge (and ⭐1 while governing).
+- **Treasury bills** (🏦 Money tab): publish an *Invitation to subscribe* for 28/91/182/364-day bills (Maldives: the MMA
+  sells them for the Ministry of Finance at fixed "tap" rates of 3.50–4.60%; price = 100 ÷ (1 + rate × days ÷ 365)).
+  Banks, the pension fund, insurers and others subscribe; you see the cover ratio, allotment and settlement. Every
+  half-year maturing bills are rolled over — if investors stay away, borrowing costs rise.
+- **Currency swap** and every other financing decision has a **📘 How it works** button that opens the lesson.
+
+## A more realistic campaign
+
+- The election body's **rules & nomination** (e.g. Elections Commission of Maldives), the voting system and the
+  spending limit; a **running mate** where president and vice president run together (Maldives, USA, Brazil).
+- **Weekly polls** by named pollsters with sample size, **margin of error**, undecided voters, a trend line and
+  "statistical tie" warnings (tap ? to learn how to read a poll).
+- **Campaign finance ledger** (raised / spent / legal limit) and a tempting illegal donation; the election body
+  audits the accounts after the vote.
+- **Campaign silence & election day** (polling stations, secret ballot, observers, turnout).
+- **Two-round systems** (Maldives, France, Brazil, Türkiye, Kazakhstan, Uzbekistan): more than 50% of valid votes
+  wins; otherwise a **runoff** between the top two, where eliminated candidates may endorse you.
+
 ## Learning to govern
 
 - **📊 Impact of every decision**: laws, budget changes, tenders, loans, expert options, cabinet advice and events each show
@@ -142,7 +165,8 @@ On phones and touch screens all buttons are at least 44 px; the pinned action ba
 
 - **Map** drawn from real latitude/longitude: all 20 administrative atolls with their Thaana code letters (ހއ, ހދ … ސ),
   traditional atoll names (Thiladhunmathi, Miladhunmadulu, Huvadhu …) and capital islands, the 5 cities (Malé, Addu,
-  Fuvahmulah, Kulhudhuffushi, Thinadhoo), the Equator and sea routes. Regions use Dhivehi names (Uthuru, Medhu, Dhekunu).
+  Fuvahmulah, Kulhudhuffushi, Thinadhoo), the Equator and sea routes. Six regions: Maalé, Uthuru, Medhu, Huvadhu,
+  **Addu City** and **Fuvahmulah City** (separate). Countries can define more than five regions (`extra: true`).
 - **Maldivian names** for rivals, ministers and the newspaper.
 - **Cabinet** with the ministry titles from the April 2026 restructuring (e.g. Ministry of Finance and Public Enterprises,
   Ministry of Tourism and Civil Aviation).
@@ -213,6 +237,9 @@ assistant.js      Chief of Staff guidance (assistant mode)
 loans.js          loan discussion in cabinet
 drafter.js        write your own bill
 tender.js         full tender document review & evaluation
+school.js         Finance School lessons & quizzes
+tbills.js         Treasury bill issuance, subscriptions, rollover
+realcamp.js       election rules, running mate, polls, campaign finance, runoff
 manifest.webmanifest, icons/  app name and icons
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured

@@ -41,6 +41,7 @@ let COUNTRY = COUNTRIES[0];
 const ROLE = { title: 'President', upper: 'PRESIDENT', race: 'Presidential', ev: 'electoral votes', palace: 'Presidential Palace' };
 function applyCountry(id) {
   COUNTRY = COUNTRIES.find(c => c.id === id) || COUNTRIES[0];
+  REGIONS.length = VELORIA_REGIONS.length;          // drop extra regions of the previous country
   REGIONS.forEach((r, i) => {
     const base = VELORIA_REGIONS[i], o = COUNTRY.regions ? COUNTRY.regions[r.id] : null;
     Object.assign(r, base, { mix: { ...base.mix }, city: [...base.city] });
@@ -51,6 +52,12 @@ function applyCountry(id) {
       if (ll) r.city = [...COUNTRY.geo(ll), o.city];
     }
   });
+  // countries with more than five regions (e.g. the Maldives: Fuvahmulah City)
+  Object.values(COUNTRY.regions || {}).filter(o => o.extra).forEach(o => {
+    const c = (COUNTRY.cities || []).find(x => x[4] === o.id && x[0].startsWith(o.city));
+    REGIONS.push({ ...o, mix: { ...o.mix }, city: c && COUNTRY.geo ? [...COUNTRY.geo([c[1], c[2]]), o.city] : [200, 150, o.city] });
+  });
+  RK.length = 0; RK.push(...REGIONS.map(r => r.id));
   COMPANIES.forEach(c => { c.base = c.base || { name: c.name, tag: c.tag, icon: c.icon, spec: c.spec }; Object.assign(c, c.base, (COMPANY_LOCAL[COUNTRY.id] || {})[c.id] || {}); });
   if (typeof NAT !== 'undefined') GK.forEach(g => NAT[g] = REGIONS.reduce((t, r) => t + r.mix[g] * r.pop, 0) / 100);
   NEIGHBOR = COUNTRY.fictional ? 'Draskor Federation' : 'Hostile Coalition';
@@ -64,6 +71,7 @@ const MAXT = () => (S && S.maxTerms) || 2;         // terms allowed
 function startBuildingsFor(C) {
   if (C.fictional) return JSON.parse(JSON.stringify(START_BUILDINGS));
   const b = { capital: ['hospital', 'school', 'airport'], north: ['factory', 'coal'], coast: ['school'], farm: ['school'], high: ['base'] };
+  RK.forEach(r => { if (!b[r]) b[r] = ['school']; });
   RK.forEach(r => { if (reg(r).coast && !b[r].includes('port')) b[r].push('port'); });
   if (C.infra >= 55) { ['north', 'coast', 'farm', 'high'].forEach(r => { if (!b[r].includes('hospital')) b[r].push('hospital'); }); ['north', 'coast'].forEach(r => b[r].push('airport')); b.capital.push('highway'); }
   if (C.infra >= 70) { ['farm', 'high'].forEach(r => b[r].push('airport')); b.north.push('highway'); b.farm.push('solar'); b.capital.push('park'); }
@@ -326,6 +334,8 @@ function startCampaign(re) {
   const used = [S.player.name, S.opp.name];
   c.minor = PARTIES.filter(p => p.id !== S.player.party && p.id !== S.opp.party).map(p => { const name = pick(oppNames().filter(n => !used.includes(n))); used.push(name); return { name, party: p.id, look: randomLook() }; });
   S.camp = c; S.phase = 'campaign'; UI.screen = 'campaign'; UI.walkFrom = null;
+  c.raised = c.funds; c.spent = 0;
+  setTimeout(() => { if (S && S.camp === c && UI.screen === 'campaign') RealCamp.intro(); }, 500);
 }
 
 async function campAction(id) {
@@ -347,10 +357,10 @@ async function campAction(id) {
       if (Math.random() < .3) { GK.forEach(k => c.symP[k] -= 1.5); news(`Backlash! Voters call ${S.player.name}'s attack ad “too negative”`); toast('The attack ad backfired!', 'bad'); }
       else news(`Attack ad on ${S.opp.name} hits hard`);
       say(`${S.opp.name} has no plan for this country!`); break;
-    case 'fund': c.funds += 12; c.symP.business += 1; c.symP.workers -= 1; say('Thank you all for your generous support!'); break;
+    case 'fund': c.funds += 12; RealCamp.raise(12); c.symP.business += 1; c.symP.workers -= 1; say('Thank you all for your generous support!'); break;
     case 'promise': c.symP[g] += 6; c.newPromises.push(g); say(`I promise: ${PROMISES[g].text.toLowerCase()}!`); news(`${S.player.name} promises to ${PROMISES[g].text.toLowerCase()}`); break;
   }
-  c.ap--; c.funds -= A.cost;
+  c.ap--; c.funds -= A.cost; RealCamp.spend(A.cost);
   const d = nationalPoll().p - before;
   if (Math.abs(d) >= 0.05) toast(`National poll ${sign(d)}%`, d >= 0 ? 'good' : 'bad');
   save(); render();
@@ -445,9 +455,11 @@ async function endWeek() {
     const c = S.camp;
     opponentTurn(); render();
     if (c.week === c.debateWeek) await debate();
+    else if (!c.re && !c.donorDone && c.week >= 3 && Math.random() < .6) await RealCamp.bigDonor();
     else if (Math.random() < .55) await campEvent();
-    c.week++; c.ap = 3; c.funds += 3;
-    if (c.week > c.weeks) { c.week = c.weeks; save(); electionNight(); return; }
+    RealCamp.poll();
+    c.week++; c.ap = 3; c.funds += 3; RealCamp.raise(3);
+    if (c.week > c.weeks) { c.week = c.weeks; save(); await RealCamp.electionDay(); electionNight(); return; }
     save(); render();
   } finally { UI.busy = false; }
 }
@@ -459,16 +471,22 @@ function electionNight() {
     const v = r.pop * 52000 * rnd(.56, .78);
     return { id: r.id, share, pv: Math.round(v * share), ov: Math.round(v * (1 - share)) };
   });
-  S.elec = { res, order: shuffle(res.map(x => x.id)), re: S.camp.re };
+  S.elec = { res, order: shuffle(res.map(x => x.id)), re: S.camp.re, round: S.camp.runoff ? 2 : 1, minorShare: RealCamp.two() && !S.camp.runoff ? clamp(nationalPoll().u * .5 + rnd(6, 13), 5, 24) : 0 };
   S.phase = 'election'; UI.screen = 'election'; UI.revealed = 0;
   news('Polls are closed. The counting begins!');
   save(); render();
-  const step = () => { if (UI.screen !== 'election') return; UI.revealed++; render(); if (UI.revealed < S.elec.order.length) setTimeout(step, 1200); else if (electionTotals().win) Confetti.burst(260); };
+  const step = () => { if (UI.screen !== 'election') return; UI.revealed++; render(); if (UI.revealed < S.elec.order.length) setTimeout(step, 1200); else if (electionTotals().win && !electionTotals().runoff) Confetti.burst(260); };
   setTimeout(step, 1000);
 }
 function electionTotals(n = S.elec.order.length) {
   let evP = 0, evO = 0, pv = 0, ov = 0;
   S.elec.order.slice(0, n).forEach(id => { const x = S.elec.res.find(y => y.id === id); if (x.share >= .5) evP += reg(id).pop; else evO += reg(id).pop; pv += x.pv; ov += x.ov; });
+  if (RealCamp.two()) {            // two-round system: the national vote decides, 50% + 1 of valid votes
+    const share = pv / Math.max(1, pv + ov);
+    if (S.elec.round === 2) return { evP, evO, pv, ov, win: share > .5, p1: share * 100, o1: (1 - share) * 100 };
+    const fr = RealCamp.firstRound({ pv, ov });
+    return { evP, evO, pv, ov, win: fr.p > 50, runoff: fr.p <= 50 && fr.o <= 50, p1: fr.p, o1: fr.o, m: fr.m };
+  }
   return { evP, evO, pv, ov, win: evP > evO || (evP === evO && pv > ov) };
 }
 
@@ -524,6 +542,8 @@ function leaveCoalition(pid) {
 
 async function afterElection() {
   const t = electionTotals(), re = S.elec.re;
+  if (t.runoff && !(S.online && !re)) return RealCamp.runoff();
+  const aud = RealCamp.audit(); if (aud) setTimeout(() => toast('⚖️ ' + aud, 'bad'), 1500);
   S.lastElection = { evP: t.evP, evO: t.evO, pvShare: t.pv / (t.pv + t.ov) * 100 };
   if (S.online && !re) {               // online game: the best vote share among players wins
     if (!S.online.result) return Online.reportResult(t);
@@ -565,7 +585,7 @@ async function afterElection() {
   await infoModal('🎉', re ? 'Re-elected!' : `You are the ${ROLE.title}!`,
     (re ? `<p>The people have given you term ${S.term}.${S.term >= MAXT() ? ' It\'s your last — make it count for your legacy.' : ''}</p>`
        : `<p>Welcome, ${ROLE.title} ${esc(S.player.name)}!</p>
-          ${COUNTRY.fictional ? '' : `<p class="muted small">${myFlag()} ${esc(S.country)}: ${fmt(S.pop, 1)}M people · GDP ${bigMoney(COUNTRY.gdp)} · debt ${fmt(COUNTRY.debt)}% of GDP · ${COUNTRY.termYears}-year terms${COUNTRY.termLimit ? `, max ${COUNTRY.termLimit}` : ''} · ${COUNTRY.parl}: ${COUNTRY.seats} seats. ${COUNTRY.note}</p>`}
+          ${COUNTRY.fictional ? '' : `<p class="muted small">${myFlag()} ${esc(S.country)}: ${S.pop < 1 ? Math.round(S.pop * 1000).toLocaleString('en') + 'k' : fmt(S.pop, 1) + 'M'} people · GDP ${bigMoney(COUNTRY.gdp)} · debt ${fmt(COUNTRY.debt)}% of GDP · ${COUNTRY.termYears}-year terms${COUNTRY.termLimit ? `, max ${COUNTRY.termLimit}` : ''} · ${COUNTRY.parl}: ${COUNTRY.seats} seats. ${COUNTRY.note}</p>`}
           <ul class="tips"><li>🏗️ <b>Build</b>: tap a region, open a tender and award the project to a company.</li>
           <li>🏘️ <b>Housing</b>: sell new homes to citizens — choose affordable, market or luxury prices.</li>
           <li>🏛️ <b>Parliament</b>: you need ${majority()} of ${S.parl.size} votes to pass laws. Form a coalition if you lack a majority.</li>
@@ -813,7 +833,7 @@ async function endTurn() {
   if (UI.busy || S.pendingEvent) return; UI.busy = true; S.clk = 0;
   try {
     const a0 = approval(), r = simulateTurn(), a1 = approval();
-    r.msgs.push(...Money.step(r));
+    r.msgs.push(...Money.step(r), ...TBills.step());
     say(a1 >= a0 ? 'Good news this half-year.' : 'Tough months. We must do better.');
     S.diploThisTurn = false;
     render();
@@ -993,10 +1013,10 @@ function mapSVG(mode) {
   }).join('');
   // roads & rail between cities
   const hasHw = id => S.buildings && S.buildings[id].includes('highway');
-  const roads = ROADS.map(([a, b]) => {
+  const roads = (COUNTRY.roads || ROADS).map(([a, b]) => {
     const A = reg(a).city, B = reg(b).city, hw = hasHw(a) || hasHw(b);
     return `<line x1="${A[0]}" y1="${A[1]}" x2="${B[0]}" y2="${B[1]}" class="${COUNTRY.atolls ? 'searoute' : 'road'} ${hw ? 'hw' : ''}"/>`;
-  }).join('') + (S.laws && S.laws.includes('rail') ? ROADS.slice(0, 4).map(([a, b]) => { const A = reg(a).city, B = reg(b).city; return `<line x1="${A[0]}" y1="${A[1]}" x2="${B[0]}" y2="${B[1]}" class="rail"/>`; }).join('') : '');
+  }).join('') + (S.laws && S.laws.includes('rail') ? (COUNTRY.roads || ROADS).slice(0, 4).map(([a, b]) => { const A = reg(a).city, B = reg(b).city; return `<line x1="${A[0]}" y1="${A[1]}" x2="${B[0]}" y2="${B[1]}" class="rail"/>`; }).join('') : '');
   const geo = COUNTRY.atolls ? atollLayer() : '';
   const cities = geo ? '' : REGIONS.map(r => `<g class="city"><circle cx="${r.city[0]}" cy="${r.city[1]}" r="${r.id === 'capital' ? 4 : 3}"/><text x="${r.city[0] + 6}" y="${r.city[1] + 3}">${r.id === 'capital' ? '★ ' : ''}${r.city[2]}</text></g>`).join('');
   // buildings & construction sites
@@ -1066,6 +1086,7 @@ function renderTitle() {
       ${saved ? `<button class="btn primary big" data-act="continue">▶ Continue as ${esc(saved.player.name)}</button>` : ''}
       <button class="btn ${saved ? '' : 'primary'} big" data-act="newGame">✨ New game</button>
       <button class="btn big" data-act="online">🌐 Online multiplayer</button>
+      <button class="btn big ghost" data-act="school">📘 Finance School</button>
       ${PWA.canShow() ? `<button class="btn big ghost ${PWA.hasPrompt() ? 'glow' : ''}" data-act="install">📲 Install app</button>` : ''}
       <button class="btn big ghost" data-act="hall">🏆 Hall of Fame</button>
     </div>
@@ -1127,7 +1148,8 @@ function renderCampaign() {
     </div>
     ${c.minor ? `<div class="also"><span class="muted small">Also running:</span>${c.minor.map(m => `<span class="mini">${avatarSVG(m.look, 0, 26)}<span>${esc(m.name)}<small style="color:${partyById(m.party).color}">${partyById(m.party).name}</small></span></span>`).join('')}</div>` : ''}
     ${pollBar(np.p, np.u, np.o)}
-    <div class="ev">Projected ${ROLE.ev}: <b style="color:${pp.color}">${np.evP}</b> – <b style="color:${op.color}">${np.evO}</b> <span class="muted">· 51 to win</span></div>
+    ${RealCamp.two() ? `<div class="ev">${esc(RealCamp.rules().body)} · two-round system: more than <b>50%</b> of valid votes wins, otherwise a runoff${c.runoff ? ' — <b>this is the runoff</b>' : ''}</div>` : `<div class="ev">Projected ${ROLE.ev}: <b style="color:${pp.color}">${np.evP}</b> – <b style="color:${op.color}">${np.evO}</b> <span class="muted">· 51 to win</span></div>`}
+    <div class="rc-row">${RealCamp.pollCard()}${RealCamp.ledger()}</div>${S.vp ? `<p class="muted small center">🤝 Running mate: <b>${esc(S.vp.name)}</b> — ${esc(S.vp.d)}</p>` : ''}
   </div>
   ${cityCard()}
   <div class="grid3">
@@ -1153,16 +1175,20 @@ function renderElection() {
   const t = electionTotals(UI.revealed), done = UI.revealed >= E.order.length;
   const rows = E.order.map((id, i) => {
     const r = reg(id), x = E.res.find(y => y.id === id);
-    if (i >= UI.revealed) return `<div class="erow pending"><b>${r.name} <small>${r.pop} EV</small></b><span class="counting">Counting votes…</span></div>`;
-    return `<div class="erow in"><b>${r.name} <small>${r.pop} EV</small></b>${pollBar(x.share * 100, 0, (1 - x.share) * 100, 'sm')}<span class="winner" style="color:${x.share >= .5 ? pp.color : op.color}">${x.share >= .5 ? '✓ ' + esc(S.player.name) : '✓ ' + esc(S.opp.name)}</span></div>`;
+    if (i >= UI.revealed) return `<div class="erow pending"><b>${r.name} <small>${r.pop}${RealCamp.two() ? '% of voters' : ' EV'}</small></b><span class="counting">Counting votes…</span></div>`;
+    return `<div class="erow in"><b>${r.name} <small>${r.pop}${RealCamp.two() ? '% of voters' : ' EV'}</small></b>${pollBar(x.share * 100, 0, (1 - x.share) * 100, 'sm')}<span class="winner" style="color:${x.share >= .5 ? pp.color : op.color}">${x.share >= .5 ? '✓ ' + esc(S.player.name) : '✓ ' + esc(S.opp.name)}</span></div>`;
   }).join('');
   const full = electionTotals();
   return `<div class="card election">
     <div class="kicker center">🗳️ Election night in ${esc(S.country)}</div>
-    <div class="evbig"><div style="color:${pp.color}"><b>${t.evP}</b><small>${esc(S.player.name)}</small></div><div class="muted">51 to win</div><div style="color:${op.color}"><b>${t.evO}</b><small>${esc(S.opp.name)}</small></div></div>
-    <div class="evtrack"><div style="width:${t.evP}%;background:${pp.color}"></div><div style="width:${t.evO}%;background:${op.color};margin-left:auto"></div><i></i></div>
+    ${RealCamp.two() ? `<div class="kicker center">${E.round === 2 ? 'Second round' : 'First round'} · ${t.p1 !== undefined ? 'popular vote counted so far' : ''}</div>
+      <div class="evbig"><div style="color:${pp.color}"><b>${fmt(t.p1 || 0, 1)}%</b><small>${esc(S.player.name)}</small></div><div class="muted">more than 50% to win</div><div style="color:${op.color}"><b>${fmt(t.o1 || 0, 1)}%</b><small>${esc(S.opp.name)}</small></div></div>
+      ${E.round !== 2 && t.m ? `<p class="center muted small">Other candidates: ${fmt(t.m, 1)}%</p>` : ''}`
+    : `<div class="evbig"><div style="color:${pp.color}"><b>${t.evP}</b><small>${esc(S.player.name)}</small></div><div class="muted">51 to win</div><div style="color:${op.color}"><b>${t.evO}</b><small>${esc(S.opp.name)}</small></div></div>`}
+    ${RealCamp.two() ? `<div class="evtrack"><div style="width:${t.p1 || 0}%;background:${pp.color}"></div><div style="width:${t.o1 || 0}%;background:${op.color};margin-left:auto"></div><i></i></div>` : `<div class="evtrack"><div style="width:${t.evP}%;background:${pp.color}"></div><div style="width:${t.evO}%;background:${op.color};margin-left:auto"></div><i></i></div>`}
     <div class="grid2">${mapSVG('elec')}<div class="erows">${rows}</div></div>
-    ${done ? `<div class="verdict big ${full.win ? 'good' : 'bad'}">${full.win ? `🎉 ${esc(S.player.name)} WINS!` : `${esc(S.opp.name)} wins the election`}</div>
+    ${done ? `<div class="verdict big ${full.runoff ? '' : full.win ? 'good' : 'bad'}">${full.runoff ? '⚖️ Nobody passed 50% — a SECOND ROUND will decide it' : full.win ? `🎉 ${esc(S.player.name)} WINS!` : `${esc(S.opp.name)} wins the election`}</div>
+      ${S.camp && S.camp.turnout ? `<p class="center muted small">Turnout ${S.camp.turnout}% · results certified by the ${esc(RealCamp.rules().body)}</p>` : ''}
       <p class="center muted">Popular vote: ${fmt(full.pv / (full.pv + full.ov) * 100, 1)}% – ${fmt(full.ov / (full.pv + full.ov) * 100, 1)}%</p>
       <div class="center"><button class="btn primary big" data-act="afterElection">${S.online && !E.re ? (S.online.result ? 'See the online result →' : 'Send my result to the online game →') : full.win ? (E.re ? 'Begin second term →' : 'Go to the palace →') : 'See your story →'}</button></div>` : ''}
   </div>`;
@@ -1382,7 +1408,7 @@ function cityCard() {
   const moodChip = g => { const v = cityMood(g, r.id); return `<span class="chip" title="${GROUPS[g].name}">${GROUPS[g].icon} ${v >= 60 ? '😊' : v < 40 ? '😠' : '😐'} ${fmt(v)}%</span>`; };
   const office = !camp && UI.view === 'office';
   const title = office ? `<b>🏛️ Office of the ${ROLE.title}</b><span class="muted small">${myFlag()} ${esc(S.country)} · ${turnLabel()} · approval ${fmt(approval())}%</span>`
-    : `<b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${fmt(people, 1)}M people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span>`;
+    : `<b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${people < .1 ? Math.round(people * 1000).toLocaleString('en') + 'k' : fmt(people, 1) + 'M'} people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span>`;
   return `<div class="card citycard ${UI.pin !== false ? 'pin' : ''} ${UI.mini ? 'mini' : ''}">
     <div class="cv-head"><div class="cv-title">${title}</div><button class="pinbtn" data-act="mini" title="${UI.mini ? 'Show' : 'Hide'} the animated scene">${UI.mini ? '🔽' : '🔼'}</button><button class="pinbtn" data-act="pin" title="Keep the panel pinned at the top">${UI.pin !== false ? '📌' : '📍'}</button>
       <div class="moods">${GK.filter(g => r.mix[g] > 0).map(moodChip).join('')}</div>${regionPicker()}</div>
@@ -1493,6 +1519,10 @@ const ACT = {
   assistOff: () => Assistant.set(false),
   loans: () => Loans.discuss(),
   draftBill: () => Drafter.open(),
+  tbIssue: () => TBills.issue(),
+  learn: d => School.open(d.id),
+  school: () => School.open(),
+  pollInfo: () => RealCamp.pollInfo(),
   setParty: d => { UI.setup.party = d.id; render(); },
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
@@ -1534,10 +1564,12 @@ function openMenu() {
   const m = modal(`<div class="m-icon">☰</div><h2>Menu</h2><div class="choices">
     <button class="choice" id="mn-resume"><b>▶ Resume</b></button>
     <button class="choice" id="mn-title"><b>🏠 Save & go to title screen</b></button>
+    <button class="choice" id="mn-school"><b>📘 Finance School</b><span class="fx">Lessons & quizzes: T-bills, currency swaps, bonds, reserves, inflation…</span></button>
     <button class="choice" id="mn-assist"><b>🧭 Assistant mode: ${Assistant.on() ? 'ON' : 'OFF'}</b><span class="fx">${Assistant.on() ? 'Tap to hide the Chief of Staff and all guidance' : 'Tap to get step-by-step guidance on running the country'}</span></button>
     ${PWA.canShow() ? '<button class="choice" id="mn-inst"><b>📲 Install as an app</b><span class="fx">Home-screen icon, full screen, works offline</span></button>' : ''}
     ${S && S.phase !== 'over' ? '<button class="choice" id="mn-quit"><b>🗑️ Abandon this game</b><span class="fx">Deletes your saved progress</span></button>' : ''}</div>`);
   $('#mn-resume', m).onclick = closeModal;
+  $('#mn-school', m).onclick = () => { closeModal(); School.open(); };
   $('#mn-assist', m).onclick = () => { closeModal(); Assistant.set(!Assistant.on()); };
   const ins = $('#mn-inst', m); if (ins) ins.onclick = () => { closeModal(); PWA.install(); };
   $('#mn-title', m).onclick = () => { closeModal(); save(); UI.screen = 'title'; render(); };
@@ -1547,6 +1579,12 @@ function openMenu() {
 function resume() {
   UI.walkFrom = null; UI.speech = 'Welcome back!';
   applyCountry(S.countryId || 'veloria');
+  RK.forEach(r => {          // a region added after this game was saved (e.g. Fuvahmulah City)
+    if (S.buildings && !S.buildings[r]) S.buildings[r] = reg(r).coast ? ['school', 'port'] : ['school'];
+    if (S.regionMods && S.regionMods[r] === undefined) S.regionMods[r] = 0;
+    if (S.housing && S.housing.stock && S.housing.stock[r] === undefined) S.housing.stock[r] = 0;
+    if (S.camp) { if (S.camp.rbP && S.camp.rbP[r] === undefined) S.camp.rbP[r] = 0; if (S.camp.rbO && S.camp.rbO[r] === undefined) S.camp.rbO[r] = 0; }
+  });
   Drafter.register();
   if (S.online && S.online.gid) Net.ready().then(ok => { if (ok) Online.enter(S.online.gid); });
   if (!S.scale) S.scale = 1; if (!S.termTurns) S.termTurns = 8; if (!S.maxTerms) S.maxTerms = 2;

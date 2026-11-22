@@ -158,6 +158,7 @@ const Money = (() => {
         S.rep = clamp((S.rep || 50) - 2); return [`The Governor declined: inflation (${fmt(S.infl, 1)}%) is above target.`, 'warn'];
       } },
   ];
+  const LEARN = { swap: 'swap', bankfx: 'tbills', tgst: 'budget', green: 'budget', fca: 'reserves', print: 'cbank', sukuk: 'bonds', imf: 'imf', tighten: 'cbank' };
   const doneThisTurn = id => S.fin.done.turn === S.turn && S.fin.done.ids.includes(id);
   async function decide(id) {
     ensure(); const A = ACTS.find(a => a.id === id); if (!A || UI.busy || S.pendingEvent) return;
@@ -167,7 +168,8 @@ const Money = (() => {
       <div class="doc-sec"><b>What it is</b><p>${A.what()}</p></div>
       <div class="doc-sec"><b>Expected effect</b><p>${A.fx}</p></div>${edu(A.edu)}
       <p class="muted small">Cost: ⭐${A.pc} political capital · one decision of each kind per half-year.</p></div>`,
-      [{ id: 'go', label: `Approve ${A.pc ? '⭐' + A.pc : ''}`, primary: true, disabled: !can }, { id: 'no', label: 'Not now' }]);
+      [{ id: 'go', label: `Approve ${A.pc ? '⭐' + A.pc : ''}`, primary: true, disabled: !can }, ...(LEARN[id] ? [{ id: 'learn', label: '📘 How it works' }] : []), { id: 'no', label: 'Not now' }]);
+    if (ch === 'learn') { await School.open(LEARN[id]); return decide(id); }
     if (ch !== 'go') return;
     S.pc -= A.pc; if (S.fin.done.turn !== S.turn) S.fin.done = { turn: S.turn, ids: [] }; S.fin.done.ids.push(id);
     const before = Impact.snap(), [msg, cls] = A.run(); toast(msg, cls === 'bad' ? 'bad' : 'good');
@@ -196,9 +198,11 @@ const Money = (() => {
     const acts = ACTS.filter(a => a.when()).map(a => `<button class="choice fin-act" data-act="finAct" data-id="${a.id}" ${doneThisTurn(a.id) || S.pc < a.pc || S.pendingEvent ? 'disabled' : ''}>
       <b>${a.icon} ${a.title()} ${a.pc ? `<small>⭐${a.pc}</small>` : ''}</b><span class="fx">${doneThisTurn(a.id) ? '✓ decided this half-year' : a.fx}</span></button>`).join('');
     return `<div class="money">
+      <div class="sch-cta"><span>📘</span><div><b>Finance School</b><small>Short lessons with diagrams: T-bills, currency swaps, bonds & sukuk, reserves, inflation, the IMF…</small></div><button class="btn small primary" data-act="school">Open</button></div>
       <div class="cb-card"><div class="cb-h">🏦 <div><b>${f.cb}</b><small>${f.since ? `Founded ${f.since} · ` : ''}${f.cur}</small></div></div>
         <p class="small">${f.regimeText}.${f.tools ? `<br><span class="muted">Tools: ${f.tools}</span>` : ''}</p></div>
       ${top}<button class="btn small" data-act="experts" data-id="${peg() ? 'fx' : 'deficit'}">🧠 Ask the experts what to do</button>${cal}
+      ${TBills.html()}
       <h3>💳 Loans <button class="btn small" data-act="loans">Discuss a loan with ministers</button></h3>${Loans.table()}
       <h3>🧾 Financing decisions</h3><p class="muted small">Proposals from the Minister of Finance. Each shows what happens before you approve.</p>
       <div class="choices tight">${acts || '<p class="muted small">No financing decisions available.</p>'}</div>
