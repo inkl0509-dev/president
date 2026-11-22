@@ -22,6 +22,7 @@ const Online = (() => {
   const partyName = id => (PARTIES.find(p => p.id === id) || { name: '—' }).name;
   const countryName = id => (COUNTRIES.find(c => c.id === id) || { name: id }).name;
   const ACT_LIMIT = 3;
+  const slugOf = n => n.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'game';
   const offersOf = () => Array.isArray(O.g && O.g.offers) ? [...O.g.offers] : [];
   const offerFor = uid => offersOf().find(o => o.uid === uid);
 
@@ -38,8 +39,8 @@ const Online = (() => {
     if (O.gid === gid && O.subs.length) return;
     unsubAll(); O.gid = gid; O.g = null; O.players = []; O.acts = [];
     localStorage.setItem('president.online', gid);
-    O.subs.push(Net.watch(pathG(), g => { O.g = g; onGame(); rerender(); }));
-    O.subs.push(Net.watchColl(`${pathG()}/players`, ps => { O.players = ps; onPlayers(); rerender(); }));
+    O.subs.push(Net.watch(pathG(), g => { O.g = g; onGame(); onDelete(); rerender(); }));
+    O.subs.push(Net.watchColl(`${pathG()}/players`, ps => { O.players = ps; onPlayers(); onDelete(); rerender(); if (S && S.phase === 'campaign' && UI.screen === 'campaign') { const el = document.getElementById('rivals'); if (el) el.outerHTML = rivalsStrip(); } }));
     O.subs.push(Net.watchColl(`${pathG()}/acts`, as => { O.acts = as.sort((a, b) => (b.ts || 0) - (a.ts || 0)); onActs(); rerender(); }, { order: ['ts', 'desc'], limit: 60 }));
   }
   function leave() { unsubAll(); O.gid = null; O.g = null; localStorage.removeItem('president.online'); }
@@ -49,7 +50,7 @@ const Online = (() => {
     UI.screen = 'online'; O.err = ''; render();
     const ok = await Net.ready();
     if (!ok) { O.err = 'offline'; render(); return; }
-    if (!O.listSub) O.listSub = Net.watchColl('games', gs => { O.list = gs.filter(g => g.phase !== 'over'); rerender(); }, { order: ['created', 'desc'], limit: 30 });
+    if (!O.listSub) O.listSub = Net.watchColl('games', gs => { O.all = gs; O.list = gs.filter(g => g.phase !== 'over' && g.phase !== 'deleted'); rerender(); }, { order: ['created', 'desc'], limit: 60 });
     const saved = (S && S.online && S.online.gid) || localStorage.getItem('president.online');
     if (saved) enter(saved);
     render();
@@ -59,8 +60,16 @@ const Online = (() => {
   async function create() {
     const name = ($('#on-gname') || {}).value || 'Election night';
     const country = ($('#on-gcountry') || {}).value || 'mv', myName = ($('#on-name') || {}).value;
+    const clean = name.trim().replace(/\s+/g, ' ').slice(0, 40);
+    if (clean.length < 3) return toast('Give the game a name of at least 3 letters.', 'bad');
+    const slug = slugOf(clean);
+    // names must be unique: check the name register and the recent games
+    const reg0 = await Net.get(`gamenames/${slug}`);
+    if (reg0 && reg0.gid) { const g0 = await Net.get(pathG(reg0.gid)); if (g0 && g0.phase !== 'deleted') return toast(`A game called “${g0.name}” already exists. Choose another name.`, 'bad'); }
+    if ((O.all || []).some(g => g.phase !== 'deleted' && slugOf(g.name || '') === slug)) return toast('A game with this name already exists. Choose another name.', 'bad');
     const gid = 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    await Net.set(pathG(gid), { name: name.slice(0, 40), country, host: me(), phase: 'lobby', created: Date.now(), offers: [], president: null, results: null, cabinet: [], soes: [], snap: null });
+    await Net.set(`gamenames/${slug}`, { gid, name: clean, at: Date.now() });
+    await Net.set(pathG(gid), { name: clean, slug, country, host: me(), phase: 'lobby', created: Date.now(), offers: [], president: null, results: null, cabinet: [], soes: [], snap: null });
     enter(gid); await join(true, myName);
   }
   async function join(silent, typed) {
@@ -75,9 +84,13 @@ const Online = (() => {
   // ---------- election ----------
   function startCampaign() {
     const p = myP(); if (!p) return;
+    if (S) save();                                      // keep whatever game is open (e.g. single-player) in its own slot
     UI.setup = { ...UI.setup, countryId: O.g.country, name: p.name, party: p.party, look: p.look || UI.setup.look, country: '' };
+    UI.pendingOnline = { gid: O.gid, uid: me() };
     newGame();
-    S.online = { gid: O.gid, uid: me() };
+    const rival = O.players.find(x => x.role === 'candidate' && x.id !== me());
+    if (rival) { S.opp = { name: rival.name, party: rival.party === p.party ? pick(PARTIES.filter(x => x.id !== p.party)).id : rival.party, look: rival.look || randomLook(), human: rival.id }; }
+    pushLive({ region: UI.region, act: 'Campaign launch' });
     news(`Online election “${O.g.name}”: ${p.name} is on the campaign trail`);
     save(); render();
   }
@@ -107,6 +120,52 @@ const Online = (() => {
       S.online.result = O.g.president === me() ? 'won' : 'lost';
       if (S.phase === 'waiting') afterElection();
     }
+  }
+  // ---------- live campaign presence (so candidates see each other) ----------
+  let liveT = null, liveData = null;
+  function pushLive(data) {
+    if (!active() || !S || !S.online || S.online.gid !== O.gid || !myP()) return;
+    liveData = { ...data, week: S.camp ? S.camp.week : 0, share: (np => Math.round((np.p <= 1 ? np.p * 100 : np.p) * 10) / 10)(nationalPoll()), at: Date.now() };
+    clearTimeout(liveT); liveT = setTimeout(() => updMe({ live: liveData }).catch(() => {}), 1200);
+  }
+  function liveRivals(region) {
+    if (!active() || !O.g || O.g.phase !== 'campaign') return [];
+    return O.players.filter(p => p.role === 'candidate' && p.id !== me() && p.live && Date.now() - p.live.at < 4 * 60000 && !(p.campaign && p.campaign.done) && (!region || p.live.region === region));
+  }
+  // ---------- deleting a game (host asks, other candidates must agree) ----------
+  const otherCands = () => O.players.filter(p => p.role === 'candidate' && p.id !== O.g.host);
+  async function askDelete() {
+    if (!isHost()) return;
+    if (!otherCands().length) {
+      const ok = await docModal(`<h2>🗑️ Delete “${esc(O.g.name)}”?</h2><p class="m-body">No other candidate is in this game, so it can be deleted now. Everyone in it will be returned to the lobby.</p>`, [{ id: 'y', label: 'Delete game', primary: true, danger: true }, { id: 'n', label: 'Cancel' }]);
+      if (ok === 'y') await finalizeDelete();
+      return;
+    }
+    await Net.update(pathG(), { delReq: { by: me(), at: Date.now() } });
+    toast('Request sent. The game is deleted when every other candidate agrees.', 'good');
+  }
+  async function finalizeDelete() {
+    const slug = O.g.slug, name = O.g.name, path = pathG();
+    if (slug) await Net.set(`gamenames/${slug}`, { gid: null, name, freed: Date.now() });   // free the name first
+    await Net.update(path, { phase: 'deleted', deletedAt: Date.now(), delReq: null });
+  }
+  function delStatus() {
+    const req = O.g && O.g.delReq; if (!req) return null;
+    const votes = otherCands().map(p => ({ p, v: p.delVote && p.delVote.at === req.at ? p.delVote.yes : undefined }));
+    return { req, votes, all: votes.every(x => x.v === true), refused: votes.filter(x => x.v === false) };
+  }
+  function onDelete() {
+    if (!O.g) return;
+    if (O.g.phase === 'deleted') {
+      const name = O.g.name;
+      store.del(mpKey(O.gid, me()));                         // this online game's save; the single-player save is untouched
+      if (S && S.online && S.online.gid === O.gid) {
+        S = null;
+      }
+      leave(); toast(`The game “${name}” was deleted.`, 'bad'); if (UI.screen === 'online') render();
+      return;
+    }
+    if (isHost()) { const st = delStatus(); if (st && st.all) finalizeDelete(); }
   }
   function becomeMember() {   // a candidate who lost the online election
     S.phase = 'member'; save(); UI.screen = 'online'; render();
@@ -257,7 +316,7 @@ const Online = (() => {
       <p class="muted">${Net.mode === 'artifact' ? 'Play with people this page is shared with. They need <b>Contributor</b> access (“can use and change data”) to join.' : 'Play with anyone who opens this site.'}</p>
       <div class="on-me"><label>Your name in the game <input id="on-name" maxlength="32" value="${esc(Net.me.name || UI.setup.name || '')}" placeholder="Type your name"></label></div>
       <h3>Open games</h3>
-      <div class="on-games">${O.list === null ? '<p class="muted small">Loading games…</p>' : O.list.length ? O.list.map(g => `<div class="on-g"><div><b>${esc(g.name)}</b><small>${esc(countryName(g.country))} · ${g.phase === 'lobby' ? 'waiting for players' : g.phase === 'campaign' ? 'campaign under way' : 'in government'}</small></div><button class="btn small primary" data-on="enter" data-id="${g.id}">${g.phase === 'lobby' ? 'Join' : 'Open'}</button></div>`).join('') : '<p class="muted small">No open games yet — create one.</p>'}</div>
+      <div class="on-games">${O.list === null ? '<p class="muted small">Loading games…</p>' : O.list.length ? O.list.map(g => `<div class="on-g"><div><b>${esc(g.name)}</b><small>${esc(countryName(g.country))} · ${g.phase === 'lobby' ? 'waiting for players' : g.phase === 'campaign' ? 'campaign under way' : 'in government'}</small></div>${store.get(mpKey(g.id, me())) ? '<span class="on-mine">💾 your game</span>' : ''}<button class="btn small primary" data-on="enter" data-id="${g.id}">${g.phase === 'lobby' ? 'Join' : 'Open'}</button></div>`).join('') : '<p class="muted small">No open games yet — create one.</p>'}</div>
       <h3>Create a game</h3>
       <div class="on-create"><input id="on-gname" maxlength="40" placeholder="Game name, e.g. Majlis 2028" value="Election ${2026 + 2}"><select id="on-gcountry">${opts}</select><button class="btn primary" data-on="create">Create & join</button></div>
       <div class="center"><button class="btn ghost" data-act="home">← Back</button></div></div>`;
@@ -270,12 +329,36 @@ const Online = (() => {
     if (!p) body = `<div class="on-box"><p>Join this game to take part.</p><label>Your name <input id="on-name" maxlength="32" value="${esc(Net.me.name || UI.setup.name || '')}"></label> <button class="btn primary" data-on="join">Join game</button></div>`;
     else if (g.phase === 'lobby' || g.phase === 'campaign') body = renderElection(g, p);
     else body = renderGov(g, p, r);
-    return `<div class="card on-card">${head}${body}<h3>👥 Players</h3>${playersList()}</div>`;
+    return `<div class="card on-card">${head}${deleteBox()}${body}<h3>👥 Players</h3>${playersList()}</div>`;
+  }
+  function deleteBox() {
+    const st = delStatus(), mine = myP();
+    if (!st) return isHost() ? `<div class="on-del"><button class="btn small ghost" data-on="askdel">🗑️ Delete this game</button><small class="muted">${otherCands().length ? 'All other candidates must agree.' : 'No other candidates — you can delete it now.'}</small></div>` : '';
+    const rows = st.votes.map(x => `<span>${esc(x.p.name)}: ${x.v === true ? '✅ agrees' : x.v === false ? '❌ refuses' : '⏳ waiting'}</span>`).join(' · ');
+    if (isHost()) return `<div class="on-del warn"><b>🗑️ You asked to delete this game.</b> ${rows}${st.refused.length ? ' — <b>refused</b>, the game stays.' : ''} <button class="btn small" data-on="canceldel">Withdraw request</button></div>`;
+    if (mine && mine.role === 'candidate') { const v = mine.delVote && mine.delVote.at === st.req.at ? mine.delVote.yes : undefined;
+      return `<div class="on-del warn"><b>🗑️ The host wants to delete this game.</b> Do you agree? ${v === undefined ? '<button class="btn small primary" data-on="delyes">Agree</button> <button class="btn small" data-on="delno">Refuse</button>' : v ? '✅ You agreed.' : '❌ You refused.'}<br><small>${rows}</small></div>`; }
+    return `<div class="on-del warn">🗑️ The host has asked to delete this game. Waiting for the candidates: ${rows}</div>`;
+  }
+  // a strip on the campaign screen showing the other human candidates live
+  function rivalsStrip() {
+    if (!S || !S.online || !active()) return '<div id="rivals"></div>';
+    const rs = O.players.filter(p => p.role === 'candidate' && p.id !== me());
+    if (!rs.length) return '<div id="rivals"></div>';
+    return `<div id="rivals" class="rivals"><b>🌐 Your rivals (live)</b>${rs.map(p => { const l = p.live, fresh = l && Date.now() - l.at < 4 * 60000, done = p.campaign && p.campaign.done;
+      return `<span class="rv" style="--pc:${partyById(p.party).color}">${avatarSVG(p.look || UI.setup.look, 0, 22)} <b>${esc(p.name)}</b> <small>${esc(partyName(p.party))}</small> ${done ? `· ✅ finished: ${p.campaign.share}%` : fresh ? `· ${esc(l.act || 'campaigning')} in <b>${esc(reg(l.region) ? reg(l.region).short : l.region)}</b> · week ${l.week} · ${l.share}%${l.region === UI.region ? ' · <b>here now!</b>' : ''}` : '· not campaigning right now'}</span>`; }).join('')}</div>`;
+  }
+  const mySave = () => O.gid ? store.get(mpKey(O.gid, me())) : null;
+  function openMine() {          // switch to this online game's own save (the single-player save stays as it is)
+    if (S && S.online && S.online.gid === O.gid) { if (S.phase === 'govern') { UI.screen = 'govern'; render(); } else resume(); return true; }
+    const sv = mySave(); if (!sv) return false;
+    if (S) save();
+    S = sv; resume(); setTimeout(onGame, 80); return true;
   }
   function myFlagFor(cid) { const c = COUNTRIES.find(x => x.id === cid); return c ? Flags.svg(Flags.code(cid), 22) : ''; }
   function renderElection(g, p) {
     const T = tally(), cands = O.players.filter(x => x.role === 'candidate');
-    const mineLocal = S && S.online && S.online.gid === O.gid;
+    const mineLocal = !!mySave();
     const partyOpts = PARTIES.map(x => `<option value="${x.id}" ${p.party === x.id ? 'selected' : ''}>${x.name}</option>`).join('');
     let you = `<div class="on-box"><h3>You</h3>
       <label>Name <input class="on-upd" data-f="name" maxlength="32" value="${esc(p.name)}"></label>
@@ -284,7 +367,7 @@ const Online = (() => {
     if (g.phase === 'campaign') {
       if (p.role === 'candidate') {
         if (p.campaign && p.campaign.done) you += `<p>✅ Your result: <b>${p.campaign.share}%</b> of the vote. Waiting for the count…</p>`;
-        else if (mineLocal && S.phase === 'campaign') you += `<button class="btn primary" data-act="continue">▶ Continue my campaign</button>`;
+        else if (mySave() && mySave().phase === 'campaign') you += `<button class="btn primary" data-on="resumeMp">▶ Continue my campaign</button>`;
         else you += `<button class="btn primary" data-on="play">🎤 Play my campaign</button><p class="muted small">You campaign against computer rivals; your national vote share is your score. Party members' volunteering adds to it.</p>`;
       } else {
         const c = cands.find(x => x.party === p.party);
@@ -378,7 +461,10 @@ const Online = (() => {
         case 'play': startCampaign(); break;
         case 'volunteer': { const p = myP(); await updMe({ volunteer: Math.min(6, (p.volunteer || 0) + 1) }); toast('Thank you, volunteer! +0.4 for your candidate', 'good'); break; }
         case 'declare': await declare(); break;
-        case 'office': if (S && S.online && S.online.gid === O.gid && S.phase === 'govern') { UI.screen = 'govern'; render(); } else toast('Your government is open in the browser where you played the campaign.', 'bad'); break;
+        case 'askdel': await askDelete(); break;
+        case 'canceldel': await Net.update(pathG(), { delReq: null }); break;
+        case 'delyes': case 'delno': await updMe({ delVote: { at: O.g.delReq.at, yes: b.dataset.on === 'delyes' } }); break;
+        case 'office': case 'resumeMp': if (!openMine()) toast('This game is saved in the browser where you played the campaign.', 'bad'); break;
         case 'accept': case 'decline': { const of = offerFor(me()); if (!of) break; const yes = b.dataset.on === 'accept'; await updMe({ response: { post: of.post, accept: yes, at: Date.now() }, role: yes ? (of.post.startsWith('soe') ? 'md' : 'minister') : 'opposition' }); toast(yes ? 'You accepted the post' : 'You declined and joined the opposition', yes ? 'good' : 'bad'); break; }
         case 'resign': await updMe({ role: 'member', response: null }); toast('You resigned', 'bad'); break;
         case 'prop': {
@@ -400,5 +486,5 @@ const Online = (() => {
     updMe({ [t.dataset.f]: v }).catch(() => toast('Could not save.', 'bad'));
   });
 
-  return { open, render: render_, active, isPresident, isHost, publishSoon, reportResult, becomeMember, teamPanel, enter, roleOf, state: O };
+  return { pushLive, liveRivals, rivalsStrip, open, render: render_, active, isPresident, isHost, publishSoon, reportResult, becomeMember, teamPanel, enter, roleOf, state: O };
 })();

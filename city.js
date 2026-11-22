@@ -103,8 +103,11 @@ const City = (() => {
     const rid = UI.region;
     return JSON.stringify([rid, S.buildings[rid], (S.projects || []).filter(p => p.region === rid).map(p => [p.type, p.turnsLeft]),
       S.housing ? S.housing.stock[rid] > 0 : 0, S.ga && S.phase === 'govern' ? GK.filter(g => S.ga[g] + S.regionMods[rid] * .5 < 35) : [], S.turn, Math.round(viewW / 50),
-      S.phase, S.camp ? [S.camp.week, S.camp.oppAt, S.opp.name] : 0]);
+      S.phase, S.camp ? [S.camp.week, S.camp.oppAt, S.opp.name] : 0, liveHere(rid).map(x => x.id)]);
   }
+  // online games: other human candidates campaigning in this region right now
+  function liveHere(rid) { return (typeof Online !== 'undefined' && Online.liveRivals && S && S.online && S.phase === 'campaign') ? Online.liveRivals(rid) : []; }
+  const who = () => (oppStage && oppStage.who) || S.opp;
   function pickGroup(r) { let x = Math.random(), acc = 0; for (const g of GK) { acc += r.mix[g]; if (x <= acc) return g; } return 'workers'; }
   function newWalker(g) {
     return { kind: 'walker', g, x: Math.random() * worldW, y: WALK + rand(-2, 2), dir: Math.random() < .5 ? 1 : -1, speed: rand(14, 26), phase: Math.random() * 6,
@@ -136,9 +139,11 @@ const City = (() => {
     const angry = S.ga && S.phase === 'govern' ? GK.filter(g => moodOf(g) < 35 && r.mix[g] > 0).sort((a, b) => moodOf(a) - moodOf(b)) : [];
     if (angry.length) { const c = lots[0]; for (let k = 0; k < 5; k++) people.push({ kind: 'protester', g: angry[0], x: c.x + 25 + k * 22, y: WALK + (k % 2) * 2, dir: 1, phase: k * 1.3, size: 1, skin: choose(SKINS), shirt: angry[0] === 'youth' ? choose(YOUTH_SHIRTS) : null, state: 'protest' }); }
     oppStage = null;
-    if (camp() && S.camp.oppAt === region) {
-      oppStage = { x: Math.max(200, worldW - 190), bubble: null };
-      const oc = partyById(S.opp.party).color;
+    const live = liveHere(region);
+    if (camp() && (live.length || S.camp.oppAt === region)) {
+      const h = live[0];
+      oppStage = { x: Math.max(200, worldW - 190), bubble: null, who: h ? { name: h.name, party: h.party, look: h.look || S.opp.look, human: true, act: h.live.act } : null };
+      const oc = partyById(who().party).color;
       for (let k = 0; k < 6; k++) { const fx = oppStage.x - 66 + k * 26 + rand(-3, 3); people.push({ kind: 'oppfan', g: pickGroup(r), x: fx, y: WALK + (k % 2) * 3, dir: fx < oppStage.x ? 1 : -1, phase: k, size: 1, skin: choose(SKINS), shirt: k % 2 ? oc : null, state: 'cheer', flag: oc }); }
     }
     if (ev && ev.region !== region) ev = null;
@@ -188,7 +193,7 @@ const City = (() => {
     cam = Math.max(0, Math.min(maxCam, cam));
     const talking = people.filter(q => q.bubble && q.bubble.until > time).length;
     if (ev && time > ev.t0 + ev.dur) endEvent();
-    if (oppStage && !oppStage.bubble && Math.random() < dt * .35) oppStage.bubble = { text: choose(DEBATE_LINES[S.opp.party]), until: time + 2.6 };
+    if (oppStage && !oppStage.bubble && Math.random() < dt * .35) oppStage.bubble = { text: oppStage.who && Math.random() < .5 ? `${oppStage.who.act || 'Rally'} in ${reg(region).city[2]} — vote ${partyById(oppStage.who.party).name}!` : choose(DEBATE_LINES[who().party]), until: time + 2.6 };
     if (oppStage && oppStage.bubble && oppStage.bubble.until < time) oppStage.bubble = null;
     if (ev) spawnEventParts(dt);
     people.forEach(p => {
@@ -371,7 +376,7 @@ const City = (() => {
     people.forEach(p => { if (p.cx != null) { R(p.cx - 5, WALK - 9, 11, 2, '#78350f'); R(p.cx - 5, WALK - 9, 1.5, 9, '#78350f'); R(p.cx + 4.5, WALK - 9, 1.5, 9, '#78350f'); R(p.cx - (p.dir > 0 ? 6 : -4.5), WALK - 18, 1.5, 10, '#78350f'); } });
   }
   function drawEventBack() {
-    if (oppStage) stageAt(oppStage.x, partyById(S.opp.party).color, `${S.opp.name.split(' ').slice(-1)[0].toUpperCase()} FOR ${ROLE.upper}`, false);
+    if (oppStage) stageAt(oppStage.x, partyById(who().party).color, `${who().name.split(' ').slice(-1)[0].toUpperCase()} FOR ${ROLE.upper}`, false);
     if (!ev) return;
     const e = ev;
     if (e.stage) {
@@ -404,7 +409,7 @@ const City = (() => {
       if (cut && time - e.cutAt < 2) text('✂️ SNIP!', e.x, WALK - 60, 12, '#b91c1c', 800);
     }
     if (oppStage) {
-      drawCandidate(S.opp.look, 0, oppStage.x, BASE - 20, false, 0, -1, S.opp.name.split(' ').slice(-1)[0].toUpperCase(), partyById(S.opp.party).color, '#fff');
+      drawCandidate(who().look, 0, oppStage.x, BASE - 20, false, 0, -1, `${who().human ? '🌐 ' : ''}${who().name.split(' ').slice(-1)[0].toUpperCase()}`, partyById(who().party).color, '#fff');
       if (oppStage.bubble) drawBubble(oppStage.x, BASE - 94, oppStage.bubble.text);
     }
     if (ev && ev.stage) {
@@ -836,7 +841,7 @@ const City = (() => {
       if (p) {
         if (p.kind === 'builder') html = '<b>👷 Construction worker</b><br>Building for your government';
         else if (p.kind === 'soldier') html = `<b>🪖 Soldier</b><br>Army strength ${fmt(S.mil.army)}`;
-        else if (p.kind === 'oppfan') html = `<b>📢 ${esc(S.opp.name)} supporter</b><br>At the ${partyById(S.opp.party).name} rally`;
+        else if (p.kind === 'oppfan') html = `<b>📢 ${esc(who().name)} supporter</b><br>At the ${partyById(who().party).name} rally${who().human ? ' (online player)' : ''}`;
         else { const v = moodOf(p.g), m = face(v); const feel = camp() ? (m > 0 ? 'Supports you' : m < 0 ? `Supports ${esc(S.opp.name)}` : 'Undecided') : (m > 0 ? 'Happy' : m < 0 ? 'Unhappy' : 'Okay'); html = `<b>${GROUPS[p.g].icon} ${p.kind === 'kid' ? 'School kid' : GROUPS[p.g].name.replace(/s$/, '')}${p.kind === 'protester' ? ' (protesting)' : ''}</b><br>${EMO[m]} ${feel} · ${fmt(v)}%${p.bubble ? `<br>“${esc(p.bubble.text)}”` : ''}`; }
       }
     }

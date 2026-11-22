@@ -108,6 +108,12 @@ On phones and touch screens all buttons are at least 44 px; the pinned action ba
      tables no-confidence motions (3 actions per half-year each). Everyone sees the state of the nation live.
 - Where it is stored: in the published Claude page, the page's shared database (people need **Contributor** access);
   on your own site, Cloud Firestore (fill in `config.js` and deploy `firestore.rules`).
+- Game names are unique (case and spacing ignored); a deleted game's name can be used again.
+- While candidates campaign, each sees the others live: a 🌐 *Your rivals* strip (where they are, what they are doing, their
+  poll share) and, when a rival is in the same region, their stage and supporters appear in the animation.
+- The host can **delete** a game: every other candidate must agree (one refusal keeps the game).
+- **Single-player and online games are saved separately** (one save per online game and player), so you can keep a
+  single-player game and any number of online games going at the same time without losing progress.
 - Re-election campaigns after the first term are played by the president alone against computer rivals.
 
 ## Game clock & experts

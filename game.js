@@ -29,6 +29,12 @@ const approvalColor = v => { const t = clamp(v, 20, 80); return t < 50 ? lerpCol
 const stars = q => '★'.repeat(Math.max(1, Math.round(q / 20))) + '☆'.repeat(5 - Math.max(1, Math.round(q / 20)));
 
 const SAVE_KEY = 'president.save.v2', BEST_KEY = 'president.best.v1';
+// Save slots: one single-player game + one save per online game, so both can run side by side.
+const mpKey = (gid, uid) => `president.save.mp.${gid}${uid ? '.' + uid : ''}`;
+const saveKey = (st = S) => st && st.online && st.online.gid ? mpKey(st.online.gid, st.online.uid) : SAVE_KEY;
+(() => {   // older versions kept an online game in the single-player slot: move it to its own slot
+  try { const s0 = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s0 && s0.online && s0.online.gid) { localStorage.setItem(mpKey(s0.online.gid, s0.online.uid), JSON.stringify(s0)); localStorage.removeItem(SAVE_KEY); } } catch (e) {}
+})();
 
 // ---------- country & role ----------
 let COUNTRY = COUNTRIES[0];
@@ -124,7 +130,7 @@ function mood() {
   if (S.ga) { const a = approval(); return a > 55 ? 1 : a < 40 ? -1 : 0; }
   return 1;
 }
-function save() { if (S && S.phase !== 'over') store.set(SAVE_KEY, S); if (typeof Online !== 'undefined' && S && S.online) Online.publishSoon(); }
+function save() { if (S && S.phase !== 'over') store.set(saveKey(), S); if (typeof Online !== 'undefined' && S && S.online) Online.publishSoon(); }
 function news(t) { S.news.unshift(t); S.news = S.news.slice(0, 14); }
 function say(t) { UI.speech = t; }
 function toast(msg, kind = '') {
@@ -294,6 +300,7 @@ function newGame() {
     term: 0, turn: 0, served: 0, promises: [], laws: [], news: [], hist: [], built: 0,
     buildings: startBuildingsFor(COUNTRY),
   };
+  if (UI.pendingOnline) { S.online = UI.pendingOnline; UI.pendingOnline = null; }
   news(`${S.player.name} announces run for ${ROLE.title.toLowerCase()} of ${S.country}`);
   startCampaign(false);
   say(`My fellow citizens of ${S.country} — I'm running for ${ROLE.title.toLowerCase()}!`);
@@ -327,6 +334,7 @@ async function campAction(id) {
   if (c.ap <= 0) return toast('No actions left — end the week.', 'bad');
   if (c.funds < A.cost) return toast('Not enough funds. Try a fundraiser.', 'bad');
   const before = nationalPoll().p, r = reg(UI.region);
+  if (S.online) Online.pushLive({ region: UI.region, act: A.name.replace(/^(Make a|Hold a|Run an?|Give a) /i, '') });
   let g = null;
   if (A.group) { g = await groupPicker(id === 'promise' ? 'Make a promise to…' : 'Hold a town hall with…', id === 'promise'); if (!g) return; }
   switch (id) {
@@ -888,7 +896,7 @@ function gameOver(reason) {
   best.push({ name: S.player.name, country: S.country, party: S.player.party, score: S.result.score, title: S.result.title, terms: S.result.terms, date: new Date().toISOString().slice(0, 10) });
   best.sort((a, b) => b.score - a.score);
   store.set(BEST_KEY, best.slice(0, 10));
-  store.del(SAVE_KEY);
+  store.del(saveKey());
   render();
 }
 
@@ -1111,7 +1119,7 @@ function renderCampaign() {
   const c = S.camp, np = nationalPoll(), pp = partyById(S.player.party), op = partyById(S.opp.party);
   const r = reg(UI.region), pr = poll(r);
   const promised = c.newPromises.map(g => ({ g }));
-  return `<div class="card camp-head">
+  return `${S.online ? Online.rivalsStrip() : ''}<div class="card camp-head">
     <div class="vs">
       <div class="cand">${avatarSVG(S.player.look, mood(), 58)}<div><b>${esc(S.player.name)}</b><small style="color:${pp.color}">${pp.name}</small></div></div>
       <div class="vs-mid"><div class="kicker">${c.re ? 'Re-election campaign' : `${ROLE.race} election campaign`}</div><div class="weeks">Week ${c.week} of ${c.weeks}${c.week === c.debateWeek ? ' · 🎙️ TV debate this week' : ''}</div></div>
@@ -1476,8 +1484,8 @@ function render() {
 // ---------- input ----------
 const ACT = {
   home: () => { UI.screen = 'title'; render(); },
-  newGame: () => { UI.screen = 'setup'; render(); },
-  continue: () => { const s = store.get(SAVE_KEY); if (s) { S = s; resume(); } },
+  newGame: () => { if (S) save(); UI.pendingOnline = null; UI.screen = 'setup'; render(); },
+  continue: () => { if (S && S.online) save(); const s = store.get(SAVE_KEY); if (s) { S = s; resume(); } },
   hall: () => { UI.screen = 'hall'; render(); loadCloud(); },
   online: () => Online.open(),
   install: () => PWA.install(),
@@ -1489,7 +1497,7 @@ const ACT = {
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
   startGame: () => newGame(),
-  region: d => { UI.view = 'city'; if (S.phase === 'govern' && !['build', 'housing'].includes(UI.tab)) UI.tab = 'build'; UI.region = d.id; render(); },
+  region: d => { UI.view = 'city'; if (S.phase === 'govern' && !['build', 'housing'].includes(UI.tab)) UI.tab = 'build'; UI.region = d.id; render(); if (S.phase === 'campaign' && S.online) Online.pushLive({ region: d.id, act: 'Touring' }); },
   camp: d => campAction(d.id),
   endWeek: () => endWeek(),
   afterElection: () => afterElection(),
@@ -1534,12 +1542,13 @@ function openMenu() {
   const ins = $('#mn-inst', m); if (ins) ins.onclick = () => { closeModal(); PWA.install(); };
   $('#mn-title', m).onclick = () => { closeModal(); save(); UI.screen = 'title'; render(); };
   const q = $('#mn-quit', m);
-  if (q) q.onclick = () => { closeModal(); store.del(SAVE_KEY); S = null; UI.screen = 'title'; render(); };
+  if (q) q.onclick = () => { closeModal(); store.del(saveKey()); S = null; UI.screen = 'title'; render(); };
 }
 function resume() {
   UI.walkFrom = null; UI.speech = 'Welcome back!';
   applyCountry(S.countryId || 'veloria');
   Drafter.register();
+  if (S.online && S.online.gid) Net.ready().then(ok => { if (ok) Online.enter(S.online.gid); });
   if (!S.scale) S.scale = 1; if (!S.termTurns) S.termTurns = 8; if (!S.maxTerms) S.maxTerms = 2;
   if (S.stats && S.infl === undefined) World.init();
   if (S.stats) initGovExtras();

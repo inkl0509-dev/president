@@ -757,3 +757,10 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }   /* room for
 .tr-audit { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; } .tr-audit > div { text-align: center; padding: 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
 .tr-audit b { display: block; font-size: 1.1rem; } .tr-audit small { color: var(--muted); font-size: .7rem; }
 @media (max-width: 760px), (pointer: coarse) { .tr-sc button { min-width: 42px; min-height: 42px; } .tr-act .btn.small { min-height: 42px; } .dr-areas button { min-height: 42px; } }
+
+/* ---------- online: live rivals & delete ---------- */
+.rivals { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; margin-bottom: .6rem; border-radius: 12px; background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.35); font-size: .8rem; }
+.rivals .rv { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.05); border-left: 3px solid var(--pc); }
+.rivals .rv small { color: var(--muted); }
+.on-del { margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.03); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .82rem; }
+.on-del.warn { background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.35); display: block; }
