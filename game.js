@@ -1054,6 +1054,7 @@ function renderTitle() {
       ${saved ? `<button class="btn primary big" data-act="continue">▶ Continue as ${esc(saved.player.name)}</button>` : ''}
       <button class="btn ${saved ? '' : 'primary'} big" data-act="newGame">✨ New game</button>
       <button class="btn big" data-act="online">🌐 Online multiplayer</button>
+      ${PWA.canShow() ? `<button class="btn big ghost ${PWA.hasPrompt() ? 'glow' : ''}" data-act="install">📲 Install app</button>` : ''}
       <button class="btn big ghost" data-act="hall">🏆 Hall of Fame</button>
     </div>
     <p class="muted small">${Cloud.enabled ? '🟢 Online Hall of Fame connected' : 'Progress is saved in this browser.'}</p>
@@ -1474,6 +1475,7 @@ const ACT = {
   continue: () => { const s = store.get(SAVE_KEY); if (s) { S = s; resume(); } },
   hall: () => { UI.screen = 'hall'; render(); loadCloud(); },
   online: () => Online.open(),
+  install: () => PWA.install(),
   setParty: d => { UI.setup.party = d.id; render(); },
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
@@ -1515,8 +1517,10 @@ function openMenu() {
   const m = modal(`<div class="m-icon">☰</div><h2>Menu</h2><div class="choices">
     <button class="choice" id="mn-resume"><b>▶ Resume</b></button>
     <button class="choice" id="mn-title"><b>🏠 Save & go to title screen</b></button>
+    ${PWA.canShow() ? '<button class="choice" id="mn-inst"><b>📲 Install as an app</b><span class="fx">Home-screen icon, full screen, works offline</span></button>' : ''}
     ${S && S.phase !== 'over' ? '<button class="choice" id="mn-quit"><b>🗑️ Abandon this game</b><span class="fx">Deletes your saved progress</span></button>' : ''}</div>`);
   $('#mn-resume', m).onclick = closeModal;
+  const ins = $('#mn-inst', m); if (ins) ins.onclick = () => { closeModal(); PWA.install(); };
   $('#mn-title', m).onclick = () => { closeModal(); save(); UI.screen = 'title'; render(); };
   const q = $('#mn-quit', m);
   if (q) q.onclick = () => { closeModal(); store.del(SAVE_KEY); S = null; UI.screen = 'title'; render(); };

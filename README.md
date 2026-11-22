@@ -64,6 +64,17 @@ Edit `COUNTRIES` in `data.js` to add more countries.
 - **Opening ceremonies**: when a project is finished, the city view shows a ribbon-cutting ceremony.
 - Flags are drawn in SVG so they also display on Windows (which has no emoji flags).
 
+## Install on a phone (PWA)
+
+The game is a Progressive Web App: on your own site (e.g. Vercel, which serves HTTPS) players can install it.
+- **Android / Chrome / Edge**: tap **📲 Install app** on the title screen (or ⋮ → *Install app*).
+- **iPhone / iPad**: open the site in Safari → Share → *Add to Home Screen* (the 📲 button shows these steps).
+It then opens full-screen with its own icon and works offline (online multiplayer needs internet).
+Files: `manifest.webmanifest`, `sw.js` (offline cache — bump `VERSION` when you deploy changes), `pwa.js`, `icons/`.
+Installing is not possible inside the Claude page preview (it runs in a frame).
+
+On phones and touch screens all buttons are at least 44 px; the pinned action bar scrolls sideways.
+
 ## Government team & online multiplayer
 
 - **👥 Government tab**: appoint ministers and the managing directors of state-owned enterprises (Maldives: MTCC, HDC,
@@ -174,6 +185,8 @@ experts.js        expert policy roundtable
 team.js           ministers & SOE managing directors
 net.js            storage adapter (Claude page db or Firebase)
 online.js         online multiplayer: lobby, election, posts, proposals, opposition
+pwa.js, sw.js     install as an app, offline cache
+manifest.webmanifest, icons/  app name and icons
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured
 firestore.rules   security rules for the leaderboard

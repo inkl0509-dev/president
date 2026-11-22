@@ -619,3 +619,55 @@ main { max-width: 1280px; margin: 0 auto; padding: 1rem; }
 .on-act { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.03); margin-bottom: 5px; font-size: .8rem; }
 .on-act p { margin: 3px 0 6px; } .on-st { float: right; font-size: .72rem; color: var(--muted); }
 .on-pl { flex-wrap: wrap; } .on-pl .on-role { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- phones & touch screens: comfortable tap targets (≥ 44 px) ---------- */
+.inst { text-align: left; line-height: 1.7; } .inst .ico { display: inline-block; padding: 0 6px; border-radius: 6px; background: var(--card2); }
+.btn.glow { border-color: var(--gold); box-shadow: 0 0 14px rgba(251,191,36,.35); }
+body { padding-bottom: env(safe-area-inset-bottom); }
+#topbar { padding-top: max(.5rem, env(safe-area-inset-top)); }
+@media (max-width: 760px), (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .btn.small { min-height: 40px; padding: .45rem .8rem; font-size: .85rem; }
+  .menu-btn, .logo { min-height: 44px; min-width: 44px; }
+  .tabs button { min-height: 44px; font-size: .9rem; }
+  .choice { min-height: 48px; }
+  input, select, textarea { font-size: 16px !important; min-height: 42px; }   /* 16px stops iPhone zooming in */
+  .tm-b { min-width: 42px; min-height: 42px; font-size: 1.05rem; }
+  .linkbtn { padding: .5rem .3rem; font-size: .85rem; }
+  .ex-iss { min-height: 40px; font-size: .82rem; }
+  .ex-o, .fin-act { min-height: 56px; }
+  .rpick button { min-height: 40px; }
+  /* pinned action bar: big icon buttons that scroll sideways */
+  .citycard.pin .cv-bar { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: .4rem; padding-bottom: 2px; scroll-snap-type: x proximity; }
+  .citycard.pin .cv-bar::-webkit-scrollbar { display: none; }
+  .citycard.pin .cvb { flex: 0 0 auto; flex-direction: column; justify-content: center; min-width: 72px; min-height: 56px; padding: .35rem .45rem; font-size: .74rem; gap: .15rem; scroll-snap-align: start; }
+  .citycard.pin .cvb span { font-size: 1.35rem; }
+  .citycard.pin .cvb-end { flex: 0 0 auto; min-height: 56px; min-width: 120px; font-size: .9rem; padding: .4rem .8rem; }
+  .citycard.pin .cvb-info { flex: 0 0 auto; }
+  .citycard.pin .pinbtn { width: 44px; height: 40px; font-size: 1rem; }
+  .clock { flex: 0 0 auto; padding: .3rem .5rem; flex-wrap: wrap; max-width: 220px; }
+  .clk-s button { min-width: 40px; min-height: 36px; font-size: 1rem; }
+  .clk-bar { width: 70px; }
+}
+@media (max-width: 760px) {
+  .citycard.pin #city { height: 120px; }
+  .citycard.pin .cv-title b { font-size: .95rem; }
+  .title-screen .menu .btn { width: 100%; }
+}
+@media (max-width: 760px) {
+  #topbar { gap: .4rem; }
+  .logo span { display: none; }
+  #topstats { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; min-width: 0; flex: 1; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  #topstats::-webkit-scrollbar { display: none; }
+  #topstats .tchip { flex: 0 0 auto; }
+  .clk-bar, .citycard.pin .cvb-info { display: none; }
+  .clock { max-width: none; flex-wrap: nowrap; gap: .3rem; }
+  .clk-d b { font-size: .8rem; }
+  .citycard.pin .cv-bar { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+}
+@media (max-width: 760px), (pointer: coarse) { .clk-s button { min-width: 44px; min-height: 44px; } }
+@media (max-width: 760px) {
+  .citycard.pin #city { height: 104px; }
+  .citycard.pin .cv-title .muted { display: none; }
+  .citycard.pin { padding: .4rem .45rem; }
+}
