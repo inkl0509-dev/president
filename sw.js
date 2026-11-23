@@ -1,7 +1,7 @@
 /* Service worker: makes the game installable and playable offline.
    Bump VERSION when you deploy new files so phones pick them up. */
-const VERSION = 'president-v6';
-const CORE = ['./', 'index.html', 'manifest.webmanifest', 'agenda.js', 'assistant.js', 'city.js', 'config.js', 'data.js', 'drafter.js', 'experts.js', 'firebase.js', 'game.js', 'gov.js', 'impact.js', 'loans.js', 'money.js', 'net.js', 'online.js', 'pwa.js', 'realcamp.js', 'scenes.js', 'school.js', 'stage.js', 'style.css', 'tbills.js', 'mega.js', 'resorts.js', 'local.js', 'team.js', 'tender.js',
+const VERSION = 'president-v7';
+const CORE = ['./', 'index.html', 'manifest.webmanifest', 'agenda.js', 'assistant.js', 'city.js', 'config.js', 'data.js', 'drafter.js', 'experts.js', 'firebase.js', 'game.js', 'gov.js', 'impact.js', 'loans.js', 'money.js', 'net.js', 'online.js', 'pwa.js', 'realcamp.js', 'scenes.js', 'school.js', 'stage.js', 'style.css', 'tbills.js', 'mega.js', 'resorts.js', 'qual.js', 'targets.js', 'local.js', 'team.js', 'tender.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
 
 self.addEventListener('install', e => {

@@ -233,7 +233,7 @@ const Mega = (() => {
            { n: COUNTRY.id === 'mv' ? 'Local contractor + foreign partner' : 'National state-owned builder', price: .96, q: 66, sp: .9, local: 1 }];
       const k = await choiceModal({ icon: '📑', title: 'Step 4 — Tender and contract', text: `${p.fin === 'loan' ? 'The loan agreement names the contractor, so there is only one bid.' : 'Three bids passed the technical check. Price is only one part — experience, method and the team decide whether it is finished on time.'}`,
         choices: bids.map(b => ({ t: b.n, note: `💰 ${usd(p.est * b.price)} · quality ${b.q}/100 · speed ${b.sp >= 1 ? 'on plan' : 'slower'}${b.local ? ' · more local jobs' : ''}` })) });
-      const b = bids[k]; Object.assign(p, { con: b.n, budget: p.est * b.price, quality: b.q, sp: b.sp, local: b.local, phase: 'build', start: S.turn, hist: [{ t: 0, plan: 0, prog: 0, spent: 0 }] });
+      const b = bids[k]; Object.assign(p, { con: b.n, budget: p.est * b.price, quality: b.q + (S.player.qual === 'engineer' ? 10 : 0), sp: b.sp, local: b.local, phase: 'build', start: S.turn, hist: [{ t: 0, plan: 0, prog: 0, spent: 0 }] });
       p.true = p.budget * (1 + p.bias * .5);   // what it would REALLY cost if nothing is done about the risks
       const before = Impact.snap();
       if (m.gain.g) { S.ga.workers = clamp(S.ga.workers + 3 + b.local * 2); }

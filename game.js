@@ -92,7 +92,7 @@ let S = null;
 const UI = {
   screen: 'title', region: 'capital', view: 'office', pin: true, tab: 'budget', speech: null, busy: false,
   walkFrom: null, revealed: 0, cloud: null,
-  setup: { name: '', country: 'Republic of Veloria', party: 'prog', countryId: 'veloria',
+  setup: { name: '', country: 'Republic of Veloria', party: 'prog', countryId: 'veloria', qual: 'teacher',
     look: { skin: '#e0ac69', hair: '#1f1308', style: 'short', suit: '#1e293b', tie: '#b91c1c' } },
 };
 
@@ -304,7 +304,7 @@ function newGame() {
     v: 2, phase: 'campaign', countryId: COUNTRY.id, flag: COUNTRY.flag,
     country: COUNTRY.fictional ? (su.country.trim() || 'Republic of Veloria') : COUNTRY.name,
     scale: COUNTRY.gdp / 100, pop: COUNTRY.pop, termTurns: COUNTRY.termYears * 2, maxTerms: COUNTRY.termLimit || 3,
-    player: { name: su.name.trim() || 'Alex Morgan', party: su.party, look: { ...su.look } },
+    player: { name: su.name.trim() || 'Alex Morgan', party: su.party, look: { ...su.look }, qual: su.qual || 'teacher' },
     opp: { name: pick(oppNames()), party: pick(PARTIES.filter(p => p.id !== su.party)).id, look: randomLook() },
     term: 0, turn: 0, served: 0, promises: [], laws: [], news: [], hist: [], built: 0,
     buildings: startBuildingsFor(COUNTRY),
@@ -312,6 +312,7 @@ function newGame() {
   if (UI.pendingOnline) { S.online = UI.pendingOnline; UI.pendingOnline = null; }
   news(`${S.player.name} announces run for ${ROLE.title.toLowerCase()} of ${S.country}`);
   startCampaign(false);
+  Qual.apply();
   say(`My fellow citizens of ${S.country} — I'm running for ${ROLE.title.toLowerCase()}!`);
   save(); render();
 }
@@ -803,6 +804,8 @@ function applyGovFx(fx) {
 }
 async function turnStart() {
   if (!S || S.phase !== 'govern' || !S.pendingEvent) return;
+  Qual.onGovern();
+  await Targets.choose();
   let ev;
   if (debtPct() > (S.crisisAt || 120) && !(S.crisisTurn && S.turn - S.crisisTurn < 4)) { ev = DEBT_EVENT; S.crisisTurn = S.turn; }
   else {
@@ -834,7 +837,7 @@ async function endTurn() {
   if (UI.busy || S.pendingEvent) return; UI.busy = true; S.clk = 0;
   try {
     const a0 = approval(), r = simulateTurn(), a1 = approval();
-    r.msgs.push(...Money.step(r), ...TBills.step(), ...Mega.step(), ...Resorts.step());
+    r.msgs.push(...Money.step(r), ...TBills.step(), ...Mega.step(), ...Resorts.step(), ...Targets.step());
     say(a1 >= a0 ? 'Good news this half-year.' : 'Tough months. We must do better.');
     S.diploThisTurn = false;
     render();
@@ -902,6 +905,7 @@ function legacy(reason) {
   if (reason === 'lost-first') score = Math.round((S.lastElection ? S.lastElection.pvShare : 0) * 10);
   else {
     score = Math.round(avgAp * 8 + statsAvg * 4 + dev * 5 + (S.gdp - 100) * 6 + S.built * 15 + kept * 60 - broken * 40 + S.served * 30 * 8 / TT() - Math.max(0, debtPct() - Math.max(60, (S.debtSoft || 80) - 20)) * 6);
+    score += (S.tgDone || 0) * 150;
     if (reason === 'retired') score += 400;
     if (reason === 'impeached') score -= 200;
   }
@@ -1122,6 +1126,8 @@ function renderSetup() {
         <div class="party-grid">${PARTIES.map(p => `<button class="party ${su.party === p.id ? 'on' : ''}" data-act="setParty" data-id="${p.id}" style="--pc:${p.color}">
           <b>${p.name}</b><small>“${p.slogan}”</small>
           <span class="bias">${GK.filter(g => p.bias[g] >= 6).map(g => GROUPS[g].icon).join('')}<em>love you</em> ${GK.filter(g => p.bias[g] <= -6).map(g => GROUPS[g].icon).join('')}<em>${GK.some(g => p.bias[g] <= -6) ? 'distrust you' : ''}</em></span></button>`).join('')}</div>
+        <div class="lbl">Qualification <span class="muted small">— your background. With assistant mode on, your Chief of Staff explains the terms you don't know yet.</span></div>
+        <div class="qual-grid">${Object.entries(QUALS).map(([k, q]) => `<button class="qual ${(su.qual || 'teacher') === k ? 'on' : ''}" data-act="setQual" data-id="${k}"><span>${q.icon}</span><b>${q.name}</b><small>${q.perk}</small><em>${q.knows.length ? 'Knows: ' + q.knows.map(f => QFIELDS[f]).join(', ') : 'Will learn all key terms'}</em></button>`).join('')}</div>
         <div class="lbl">Look</div>
         ${swatches('skin', LOOKS.skin)}${swatches('hair', LOOKS.hair)}${swatches('style', LOOKS.style)}${swatches('suit', LOOKS.suit)}${swatches('tie', LOOKS.tie)}
         <div class="row-end"><button class="btn ghost" data-act="home">Back</button><button class="btn primary big" data-act="startGame">Launch campaign →</button></div>
@@ -1144,7 +1150,7 @@ function renderCampaign() {
   const promised = c.newPromises.map(g => ({ g }));
   return `${S.online ? Online.rivalsStrip() : ''}<div class="card camp-head">
     <div class="vs">
-      <div class="cand">${avatarSVG(S.player.look, mood(), 58)}<div><b>${esc(S.player.name)}</b><small style="color:${pp.color}">${pp.name}</small></div></div>
+      <div class="cand">${avatarSVG(S.player.look, mood(), 58)}<div><b>${esc(S.player.name)}</b><small style="color:${pp.color}">${pp.name}</small>${Qual.badge()}</div></div>
       <div class="vs-mid"><div class="kicker">${c.re ? 'Re-election campaign' : `${ROLE.race} election campaign`}</div><div class="weeks">Week ${c.week} of ${c.weeks}${c.week === c.debateWeek ? ' · 🎙️ TV debate this week' : ''}</div></div>
       <div class="cand right"><div><b>${esc(S.opp.name)}</b><small style="color:${op.color}">${op.name}</small></div>${avatarSVG(S.opp.look, 0, 58)}</div>
     </div>
@@ -1153,6 +1159,7 @@ function renderCampaign() {
     ${RealCamp.two() ? `<div class="ev">${esc(RealCamp.rules().body)} · two-round system: more than <b>50%</b> of valid votes wins, otherwise a runoff${c.runoff ? ' — <b>this is the runoff</b>' : ''}</div>` : `<div class="ev">Projected ${ROLE.ev}: <b style="color:${pp.color}">${np.evP}</b> – <b style="color:${op.color}">${np.evO}</b> <span class="muted">· 51 to win</span></div>`}
     <div class="rc-row">${RealCamp.pollCard()}${RealCamp.ledger()}</div>${S.vp ? `<p class="muted small center">🤝 Running mate: <b>${esc(S.vp.name)}</b> — ${esc(S.vp.d)}</p>` : ''}
   </div>
+  ${Qual.termCard() ? `<div class="card cos-camp">${Qual.termCard()}</div>` : ''}
   ${cityCard()}
   <div class="grid3">
     <div class="card mapcard">${bubble()}${mapSVG('camp')}<p class="muted small center">Tap a region to travel there.</p></div>
@@ -1422,11 +1429,11 @@ const TABS = [['agenda', '📜 Manifesto'], ['team', '👥 Government'], ['money
 function renderGovern() {
   const ap = approval(), pp = partyById(S.player.party), inTerm = (S.turn - 1) % TT() + 1;
   const tabHTML = { team: () => Team.html(), agenda: () => Manifesto.html(), money: () => Money.html(), mega: () => Mega.html(), budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
-  return `${cityCard()}${Assistant.card()}<div class="grid3 gov">
+  return `${cityCard()}${Targets.card()}${Assistant.card()}<div class="grid3 gov">
     <div class="card leader">
       <div class="portrait">${bubble()}${avatarSVG(S.player.look, mood(), 110, 'float')}</div>
       <h2>${esc(S.player.name)}</h2><div class="muted">${ROLE.title} of ${myFlag()} ${esc(S.country)}</div>
-      <div class="party-chip" style="--pc:${pp.color}">${pp.name}</div>
+      <div class="party-chip" style="--pc:${pp.color}">${pp.name}</div>${Qual.badge()}
       <div class="ring" style="--v:${ap};--c:${approvalColor(ap)}"><div><b>${fmt(ap)}%</b><small>approval</small></div></div>
       <div class="kv"><span>Term</span><b>${S.term} of ${MAXT()} · half-year ${inTerm}/${TT()}</b></div>
       <div class="kv"><span>Political capital</span><b>⭐ ${S.pc}</b></div>
@@ -1526,6 +1533,10 @@ const ACT = {
   school: () => School.open(),
   pollInfo: () => RealCamp.pollInfo(),
   setParty: d => { UI.setup.party = d.id; render(); },
+  setQual: d => { UI.setup.qual = d.id; render(); },
+  learnTerm: d => Qual.learn(d.id),
+  glossary: d => Qual.glossary(d.id),
+  targets: () => Targets.details(),
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
   startGame: () => newGame(),
@@ -1568,11 +1579,13 @@ function openMenu() {
   const m = modal(`<div class="m-icon">☰</div><h2>Menu</h2><div class="choices">
     <button class="choice" id="mn-resume"><b>▶ Resume</b></button>
     <button class="choice" id="mn-title"><b>🏠 Save & go to title screen</b></button>
+    <button class="choice" id="mn-gloss"><b>📖 Key terms glossary</b><span class="fx">GDP, deficit, debt, inflation, reserves, majority… explained simply</span></button>
     <button class="choice" id="mn-school"><b>📘 Finance School</b><span class="fx">Lessons & quizzes: T-bills, currency swaps, bonds, reserves, inflation…</span></button>
     <button class="choice" id="mn-assist"><b>🧭 Assistant mode: ${Assistant.on() ? 'ON' : 'OFF'}</b><span class="fx">${Assistant.on() ? 'Tap to hide the Chief of Staff and all guidance' : 'Tap to get step-by-step guidance on running the country'}</span></button>
     ${PWA.canShow() ? '<button class="choice" id="mn-inst"><b>📲 Install as an app</b><span class="fx">Home-screen icon, full screen, works offline</span></button>' : ''}
     ${S && S.phase !== 'over' ? '<button class="choice" id="mn-quit"><b>🗑️ Abandon this game</b><span class="fx">Deletes your saved progress</span></button>' : ''}</div>`);
   $('#mn-resume', m).onclick = closeModal;
+  $('#mn-gloss', m).onclick = () => { closeModal(); Qual.glossary(); };
   $('#mn-school', m).onclick = () => { closeModal(); School.open(); };
   $('#mn-assist', m).onclick = () => { closeModal(); Assistant.set(!Assistant.on()); };
   const ins = $('#mn-inst', m); if (ins) ins.onclick = () => { closeModal(); PWA.install(); };
@@ -1590,6 +1603,7 @@ function resume() {
     if (S.camp) { if (S.camp.rbP && S.camp.rbP[r] === undefined) S.camp.rbP[r] = 0; if (S.camp.rbO && S.camp.rbO[r] === undefined) S.camp.rbO[r] = 0; }
   });
   Drafter.register();
+  if (S.player && !S.player.qual) { S.player.qual = 'teacher'; S.qualDone = 1; }   // saves from before qualifications
   if (S.deck && !S.localDeck) { S.localDeck = 1; if (!Local.has(S.deck)) S.deck = shuffle(Local.deckIds()); }   // older saves: add the country's own events
   if (typeof Mega !== 'undefined') Mega.init();
   if (S.online && S.online.gid) Net.ready().then(ok => { if (ok) Online.enter(S.online.gid); });

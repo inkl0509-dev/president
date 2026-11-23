@@ -109,6 +109,14 @@ Below the megaprojects, lease uninhabited islands for resorts: pick an atoll and
 
 Voter groups and events follow the country. India has **Farmers (kisan)**, marches on Delhi for a legal minimum support price, failed monsoons and onion prices. The Maldives has **Fishers & islanders** and **Resort & port workers**, tuna prices, the resort service charge, Malé housing, swell-wave flooding, coral bleaching, migrant workers, island harbours, Thilafushi and desalination — and no earthquakes, land borders or oil fields. France has pension strikes and motorway blockades; Kazakhstan fuel-price protests and spring floods; Uzbekistan the cotton harvest and the Aral Sea; Brazil the Amazon; Japan emptying villages; and so on. Events are simplified scenarios based on real issues; add more in `local.js`.
 
+## 🎯 Targets, qualifications and key terms
+
+**Qualification.** When you create your candidate, choose a background: economist, lawyer, business owner, engineer, doctor, teacher, military officer, activist/union leader, or self-made with no degree. Each gives a small advantage (e.g. doctors start with better health, engineers build megaprojects to higher quality) and decides what you already know.
+
+**Key terms.** With assistant mode on, the Chief of Staff explains — one at a time, during the campaign and in government — the terms your candidate does not know yet: GDP, growth, budget, deficit and surplus, public debt, interest, inflation, unemployment, majority, constitution, central bank, reserves, the peg, T-bills, PPPs and more. Each explanation includes what it means for your country right now (e.g. "You are running a deficit of 3.1% of GDP"). An economist skips the economics; a doctor learns everything. All terms are in **☰ → 📖 Key terms glossary**.
+
+**Targets.** At the start of each term you publish targets. A balanced budget or surplus is always required; choose up to 3 more (debt below a level, inflation 1–5%, lower unemployment, growth, enough electricity, reserves of 3 months in pegged countries, housing, health, approval). A target is achieved when met for a full year (two half-years in a row): ⭐+2, more public trust and +150 points in your final score. Missed targets at the end of the term cost trust. The 🎯 strip shows live progress; **Details** explains how to reach each one.
+
 ## Learning to govern
 
 - **📊 Impact of every decision**: laws, budget changes, tenders, loans, expert options, cabinet advice and events each show
@@ -263,6 +271,8 @@ school.js         Finance School lessons & quizzes
 tbills.js         Treasury bill issuance, subscriptions, rollover
 realcamp.js       election rules, running mate, polls, campaign finance, runoff
 resorts.js        Maldives island resort leasing
+qual.js           qualifications and the key-terms glossary
+targets.js        national targets (budget surplus and others)
 mega.js           megaprojects: feasibility, EIA, financing, tender, monitored construction
 local.js          country-specific voter groups and events (farmers' protests, fishers, strikes…)
 manifest.webmanifest, icons/  app name and icons
