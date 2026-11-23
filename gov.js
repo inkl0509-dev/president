@@ -247,7 +247,7 @@ const Paper = (() => {
     if (e.rate) c.push(`<span class="chip ${e.rate < 0 ? 'up' : 'down'}">borrowing costs ${e.rate > 0 ? '▲' : '▼'}</span>`);
     return c.join(' ');
   }
-  return { show };
+  return { show, journalists };
 })();
 
 // ============================================================

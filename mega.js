@@ -456,7 +456,7 @@ const Mega = (() => {
         const used = list.some(p => p.id === m.id && !['cancelled', 'shelved'].includes(p.phase));
         return `<div class="mg-opt"><div class="mg-head"><span class="mg-ic">${m.icon}</span><div><b>${m.name}</b><small>≈ ${usd(base(m))} (${fmt(base(m) / S.gdp * 100, 1)}% of GDP) · ${m.turns / 2} years · ${(reg(m.site) || REGIONS[0]).name}</small></div></div><p>${m.why}</p>
           <button class="btn small ${used || running >= 3 ? '' : 'primary'}" data-act="mega" data-id="start|${m.id}" ${used || running >= 3 ? 'disabled' : ''}>${used ? 'Already started' : 'Feasibility study →'}</button></div>`;
-      }).join('')}</div>${typeof Resorts !== 'undefined' && COUNTRY.id === 'mv' ? Resorts.html() : ''}</div>`;
+      }).join('')}</div>${typeof Resorts !== 'undefined' && COUNTRY.id === 'mv' ? Resorts.html() : ''}${typeof Oil !== 'undefined' ? Oil.html() : ''}</div>`;
   }
   return { init, step, html, act, ceremony, alerts, avail, active, MEGA };
 })();

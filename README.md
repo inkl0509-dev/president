@@ -109,6 +109,34 @@ Below the megaprojects, lease uninhabited islands for resorts: pick an atoll and
 
 Voter groups and events follow the country. India has **Farmers (kisan)**, marches on Delhi for a legal minimum support price, failed monsoons and onion prices. The Maldives has **Fishers & islanders** and **Resort & port workers**, tuna prices, the resort service charge, Malé housing, swell-wave flooding, coral bleaching, migrant workers, island harbours, Thilafushi and desalination — and no earthquakes, land borders or oil fields. France has pension strikes and motorway blockades; Kazakhstan fuel-price protests and spring floods; Uzbekistan the cotton harvest and the Aral Sea; Brazil the Amazon; Japan emptying villages; and so on. Events are simplified scenarios based on real issues; add more in `local.js`.
 
+## 🧑‍💼 The President's advisers
+
+The **Advisers** button in the office opens your personal team (separate from ministers and the expert roundtable). Each reads the current situation, gives advice with buttons to act, and answers common questions:
+
+- ⚖️ **Legal Counsel** — scandal risk, direct awards, fast-tracked EIAs, rights and term limits; order a legal audit (⭐1). Answers: term limits, central bank independence, tenders, protests, dismissing ministers vs judges.
+- 🩺 **President's Physician** — your own stress and fitness. Crises, low approval, scandals, deficits and running megaprojects raise stress; rest and an exercise routine lower it. Above 75 you lose political capital; above 90 you may collapse. Also advises on public health.
+- 🌐 **Foreign Policy Adviser** — reputation, neighbours, borrowing from foreign lenders, climate finance, alliances, the UN.
+- 📣 **Press Secretary** — the unhappiest group, the top story, press conferences, handling scandals.
+- 🛡️ **National Security Adviser** — threat level, defence spending, wider security (in the Maldives: the sea, smuggling, disasters).
+- 🗳️ **Political Strategist** — time to the election, majority in parliament, pledges and targets.
+- 🌍 **Climate & Environment Adviser** — environment, electricity, adaptation vs mitigation, reclamation.
+
+A red dot means an adviser wants to see you; the assistant reminds you too. Legal answers are simplified explanations for learning.
+
+## 🎙️ Press conferences and 🏛️ question time
+
+**Press conference** (🎙️ Press in the office, once per half-year). Choose up to 3 ministers to stand with you. Journalists ask about the country's real current concerns — deficit, debt, prices, jobs, dollar shortage, scandals, hospitals, schools, housing, crime, power cuts, environment, late megaprojects, islands leased without bidding, today's headline. For each question: answer honestly, defend the government, promise quick action (checked next half-year — broken promises cost trust), or ask a minister on stage to answer (their skill and whether it is their area decide how well it goes).
+
+**Question time** (Parliament tab, once per half-year). The Speaker opens the session and opposition MPs question the responsible ministers. The minister can give the facts and a plan, attack the opposition's record, or promise a report to the committee. Ministers who keep answering badly face a **motion of no confidence**: defend them (you need a majority) or ask them to resign.
+
+## 🛢️ Oil & gas exploration
+
+In the Megaprojects tab every country can look for oil — even the Maldives, where past exploration found no commercial oil, so the chance is low (and a spill would hit reefs and tourism). Offer a block (open licensing round or direct deal), set environmental rules, and the oil company pays for the seismic survey and the exploration well. Most wells in low-chance countries are dry. If oil is found, choose the contract (production sharing, royalty and tax, or a national oil company) and whether to save half in a sovereign wealth fund or spend it all (the "resource curse": inflation and dependence on oil). Producing fields pay the state every half-year at the current oil price; spills are possible.
+
+## 🗣️ Debates that don't repeat
+
+The debate pool now has many more questions, plus country questions (Maldives: Malé housing, rising seas, fishers, island leasing, resort jobs, atoll hospitals, ferries; India: MSP, jobs, air pollution; and others). Questions already asked in a game are not repeated, and at re-election the moderator asks about your record using your real numbers.
+
 ## 🎯 Targets, qualifications and key terms
 
 **Qualification.** When you create your candidate, choose a background: economist, lawyer, business owner, engineer, doctor, teacher, military officer, activist/union leader, or self-made with no degree. Each gives a small advantage (e.g. doctors start with better health, engineers build megaprojects to higher quality) and decides what you already know.
@@ -273,6 +301,10 @@ realcamp.js       election rules, running mate, polls, campaign finance, runoff
 resorts.js        Maldives island resort leasing
 qual.js           qualifications and the key-terms glossary
 targets.js        national targets (budget surplus and others)
+advisers.js       the president's personal advisers and the president's own health
+qa.js             press conferences and parliamentary question time (built from current concerns)
+oil.js            oil & gas exploration, contracts and the wealth fund
+debateq.js        larger debate question pool, country questions, no repeats
 mega.js           megaprojects: feasibility, EIA, financing, tender, monitored construction
 local.js          country-specific voter groups and events (farmers' protests, fishers, strikes…)
 manifest.webmanifest, icons/  app name and icons

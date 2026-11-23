@@ -409,7 +409,7 @@ async function debate() {
     await Debate.say(i, i === PLAYER ? `Good evening, ${S.country}! I'm ${who.name}.` : `Good evening. I'm ${who.name} of the ${partyById(who.party).name}.`, 1700);
     Debate.react(i === PLAYER ? 1 : 0);
   }
-  const qs = shuffle(DEBATE_Q).slice(0, 3);
+  const qs = debateQuestions(3);
   for (const [i, q] of qs.entries()) {
     await Debate.say(MOD, `Question ${i + 1}: ${q.q.replace(/"/g, '')}`, 2600);
     const k = await Debate.ask(`Question ${i + 1} of 3: ${q.q}`, q.a, a => fxChips(a.fx, 'camp'));
@@ -837,7 +837,7 @@ async function endTurn() {
   if (UI.busy || S.pendingEvent) return; UI.busy = true; S.clk = 0;
   try {
     const a0 = approval(), r = simulateTurn(), a1 = approval();
-    r.msgs.push(...Money.step(r), ...TBills.step(), ...Mega.step(), ...Resorts.step(), ...Targets.step());
+    r.msgs.push(...Money.step(r), ...TBills.step(), ...Mega.step(), ...Resorts.step(), ...Targets.step(), ...Advisers.step(), ...Oil.step(), ...Presser.checkPromises());
     say(a1 >= a0 ? 'Good news this half-year.' : 'Tough months. We must do better.');
     S.diploThisTurn = false;
     render();
@@ -1314,6 +1314,7 @@ function parlHTML() {
   const me = S.player.party, cs = coalitionSeats();
   return `${hemicycle()}
   <div class="muted small center">${esc(COUNTRY.parl || 'Parliament')} · ${S.parl.size || 100} seats</div>
+  <div class="qt-box"><div><b>🏛️ Question time</b><small>Opposition MPs question your ministers in the chamber about current problems. Weak answers can lead to a no-confidence motion.</small></div><button class="btn small ${S.qtime === S.turn ? '' : 'primary'}" data-act="qtime" ${S.qtime === S.turn || S.pendingEvent ? 'disabled' : ''}>${S.qtime === S.turn ? 'Held this half-year' : 'Hold question time →'}</button></div>
   <div class="verdict ${cs >= majority() ? 'good' : 'bad'} small-v">${cs >= majority() ? `✓ Your coalition has a majority (${cs}/${S.parl.size || 100})` : `✗ No majority (${cs}/${S.parl.size || 100}) — laws need opposition votes`}</div>
   ${PARTIES.filter(p => S.parl.seats[p.id]).map(p => {
     const inC = S.parl.coalition.includes(p.id), rel = S.parl.rel[p.id];
@@ -1381,8 +1382,10 @@ function cityBar(camp) {
     ${Clock.html()}<div class="cvb-info"><b>⭐ ${S.pc} PC</b></div>
     <button class="cvb" data-act="cabinet" ${S.pendingEvent ? 'disabled' : ''}><span>👔</span>Cabinet<small>${S.cabinetDone && S.cabinetDone.turn === S.turn ? 'held' : 'briefings'}</small></button>
     <button class="cvb ${Experts.urgent().length ? 'alert' : ''}" data-act="experts" ${S.pendingEvent ? 'disabled' : ''} title="Ask economists, the central bank, the IMF, business and unions what to do"><span>🧠</span>Experts<small>${Experts.urgent().length ? Experts.urgent().length + ' issue' + (Experts.urgent().length > 1 ? 's' : '') : 'advice'}</small></button>
+    <button class="cvb ${Advisers.urgent().length ? 'alert' : ''}" data-act="advisers" ${S.pendingEvent ? 'disabled' : ''} title="Your legal counsel, physician, foreign policy adviser, press secretary and more"><span>🧑‍💼</span>Advisers<small>${Advisers.urgent().length ? Advisers.urgent().length + ' want to see you' : 'lawyer · doctor · more'}</small></button>
     <button class="cvb" data-act="buildPick" ${S.pendingEvent ? 'disabled' : ''}><span>🏗️</span>Build<small>tender in ${reg(UI.region).short}</small></button>
     <button class="cvb" data-act="tab" data-id="laws" data-scroll="1"><span>📜</span>Bill<small>draft a law</small></button>
+    <button class="cvb" data-act="presser" ${S.presser === S.turn || S.pendingEvent ? 'disabled' : ''} title="Journalists ask about current concerns; your ministers join you"><span>🎙️</span>Press<small>${S.presser === S.turn ? 'held' : 'conference'}</small></button>
     <button class="cvb" data-act="speechPick" ${S.pc < 1 || S.pendingEvent ? 'disabled' : ''}><span>🎤</span>Speech<small>⭐1</small></button>
     <button class="cvb" data-act="foreign" ${S.pendingEvent ? 'disabled' : ''}><span>✈️</span>Foreign<small>${S.tripTurn === S.turn ? 'trip done' : 'UN · summits · visits'}</small></button>
     <button class="cvb" data-act="tab" data-id="parl" data-scroll="1"><span>🏛️</span>Parliament<small>${coalitionSeats()}/${S.parl.size || 100}</small></button>
@@ -1537,6 +1540,11 @@ const ACT = {
   learnTerm: d => Qual.learn(d.id),
   glossary: d => Qual.glossary(d.id),
   targets: () => Targets.details(),
+  advisers: () => Advisers.office(),
+  presser: () => Presser.run(),
+  qtime: () => QTime.run(),
+  oil: d => Oil.act(d.id),
+  adv: d => Advisers.act(d.id),
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
   startGame: () => newGame(),
