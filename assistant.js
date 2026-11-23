@@ -16,6 +16,7 @@ const LESSONS = [
   ['Debt sustainability', 'Debt is safe when the economy grows faster than the interest rate and the budget stops adding to it. Cheap, long-term loans are better than expensive short ones.'],
   ['Diplomacy pays', 'Friendly partners provide trade, investment, tourists and help in emergencies. Summits and state visits build that trust.'],
   ['Accountability', 'A free press and an active opposition can be uncomfortable, but they expose mistakes early — before they become disasters.'],
+  ['Megaprojects', 'Big projects almost always cost more and take longer than first planned (“optimism bias”). Good governments study feasibility first, assess the environment honestly, choose builders on quality not just price, and check progress with independent engineers.'],
   ['Long-term thinking', 'Schools, hospitals and clean energy pay off over decades, after your term ends. Great leaders invest for the next generation, not just the next election.'],
 ];
 
@@ -31,6 +32,8 @@ const Assistant = (() => {
     if (!(S.cabinetDone && S.cabinetDone.turn === S.turn)) out.push(['👔', 'Start the half-year with a <b>cabinet meeting</b> — each minister reports on their sector and proposes action.', btn('cabinet', '', 'Hold cabinet →')]);
     const urgent = typeof Experts !== 'undefined' ? Experts.urgent() : [];
     if (urgent.length) out.push(['🧠', `<b>${urgent[0].name}.</b> Ask the experts what the options are before you act.`, btn('experts', urgent[0].id, 'Ask experts →')]);
+    if (typeof Mega !== 'undefined' && Mega.alerts()) out.push(['🚧', `A <b>megaproject</b> needs your decision (${Mega.alerts()} warning${Mega.alerts() > 1 ? 's' : ''}). If you do not decide, the site manager will.`, btn('tab', 'mega', 'Megaprojects →')]);
+    else if (typeof Mega !== 'undefined' && Mega.active().some(p => p.phase === 'build' && p.insp !== S.turn && S.turn - (p.insp || p.start) >= 2)) out.push(['🔍', 'Nobody has inspected your megaproject for a year. Reported progress may be too optimistic — <b>visit the site</b>.', btn('tab', 'mega', 'Megaprojects →')]);
     if (def > 4) out.push(['💰', `The deficit is ${fmt(def, 1)}% of GDP. Review the <b>budget</b>: trim spending or raise revenue, or discuss cheaper loans in cabinet.`, btn('tab', 'budget', 'Budget →')]);
     if (Money.peg() && Money.cover() < 2) out.push(['💵', `Dollar reserves cover only ${fmt(Money.cover(), 1)} months of imports. Plan financing now.`, btn('tab', 'money', 'Money →')]);
     const unkept = S.promises.filter(p => p.term === S.term && !p.broken && !S.laws.includes(PROMISES[p.g].law));

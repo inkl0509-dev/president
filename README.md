@@ -87,6 +87,24 @@ Edit `COUNTRIES` in `data.js` to add more countries.
 - **Two-round systems** (Maldives, France, Brazil, Türkiye, Kazakhstan, Uzbekistan): more than 50% of valid votes
   wins; otherwise a **runoff** between the top two, where eliminated candidates may endorse you.
 
+## 🚧 Megaprojects (monitor them closely)
+
+Open the **🚧 Megaprojects** tab to launch a flagship project. Each one goes through the real stages:
+
+1. **Feasibility study** (one half-year, about 1% of the cost) — an updated cost estimate and a benefit–cost ratio. Early estimates are usually too low (optimism bias).
+2. **Environmental & social impact assessment** — full EIA with public hearings (slower, fewer protests) or fast-track (quicker, more protests and land disputes).
+3. **Financing** — budget and bonds/sukuk, a bilateral development loan (cheaper, but the lender picks the contractor) or a public–private partnership (less money now, payments for years after it opens).
+4. **Tender** — experienced consortium, lowest bidder or national/local builder: price against quality and speed.
+5. **Construction** — every half-year the dashboard shows reported progress against plan (S-curve), the schedule and cost indices (earned value), money spent, safety, quality and a **risk register** with mitigations (supervision engineer, community fund, fixed-price contracts). Risks become decisions; if you ignore them, the site manager decides. **Site inspections** reveal the true progress (contractors report generously) and defects. You can pause, give public updates or cancel (and learn about the sunk-cost trap).
+
+On opening, a ceremony compares time, cost and quality with the plan, and the project keeps adding to growth, energy and services.
+
+Projects depend on the country: nuclear plants, high-speed rail, metros, dams, offshore wind, new cities and irrigation where they make sense; in the **Maldives** the Greater Malé sea bridge, land reclamation, a new Velana terminal, the Gulhifalhu port, coastal protection, island solar and a waste-to-energy plant (no nuclear plant — and Germany has none since its 2023 phase-out). Costs are rough game estimates.
+
+## Each country is different
+
+Voter groups and events follow the country. India has **Farmers (kisan)**, marches on Delhi for a legal minimum support price, failed monsoons and onion prices. The Maldives has **Fishers & islanders** and **Resort & port workers**, tuna prices, the resort service charge, Malé housing, swell-wave flooding, coral bleaching, migrant workers, island harbours, Thilafushi and desalination — and no earthquakes, land borders or oil fields. France has pension strikes and motorway blockades; Kazakhstan fuel-price protests and spring floods; Uzbekistan the cotton harvest and the Aral Sea; Brazil the Amazon; Japan emptying villages; and so on. Events are simplified scenarios based on real issues; add more in `local.js`.
+
 ## Learning to govern
 
 - **📊 Impact of every decision**: laws, budget changes, tenders, loans, expert options, cabinet advice and events each show
@@ -240,6 +258,8 @@ tender.js         full tender document review & evaluation
 school.js         Finance School lessons & quizzes
 tbills.js         Treasury bill issuance, subscriptions, rollover
 realcamp.js       election rules, running mate, polls, campaign finance, runoff
+mega.js           megaprojects: feasibility, EIA, financing, tender, monitored construction
+local.js          country-specific voter groups and events (farmers' protests, fishers, strikes…)
 manifest.webmanifest, icons/  app name and icons
 config.js         Firebase config (leave empty to play offline)
 firebase.js       online Hall of Fame (Firestore), loaded only if configured

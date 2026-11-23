@@ -12,7 +12,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const fmt = (n, d = 0) => Number(n).toFixed(d);
 const sign = (n, d = 1) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(d);
-const bigMoney = b => { const a = Math.abs(b); return (b < 0 ? '−' : '') + (a >= 1000 ? '$' + (a / 1000).toFixed(a >= 10000 ? 1 : 2) + 'T' : '$' + a.toFixed(a >= 100 ? 0 : 1) + 'B'); };
+const bigMoney = b => { const a = Math.abs(b); return (b < 0 ? '−' : '') + (a >= 1000 ? '$' + (a / 1000).toFixed(a >= 10000 ? 1 : 2) + 'T' : a < 1 ? '$' + (a * 1000).toFixed(a < .01 ? 1 : 0) + 'M' : '$' + a.toFixed(a >= 100 ? 0 : 1) + 'B'); };
 const money = n => bigMoney(n * ((S && S.scale) || 1));   // game money is in "Veloria units"; shown at the real country's scale
 const gdpReal = () => S.gdp * (S.scale || 1);
 const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
@@ -62,6 +62,7 @@ function applyCountry(id) {
   if (typeof NAT !== 'undefined') GK.forEach(g => NAT[g] = REGIONS.reduce((t, r) => t + r.mix[g] * r.pop, 0) / 100);
   NEIGHBOR = COUNTRY.fictional ? 'Draskor Federation' : 'Hostile Coalition';
   const pres = COUNTRY.system === 'presidential';
+  if (typeof Local !== 'undefined') Local.apply(COUNTRY.id);
   Object.assign(ROLE, { title: COUNTRY.title, upper: COUNTRY.title.toUpperCase(), race: pres ? 'Presidential' : 'General', ev: pres ? 'electoral votes' : 'seat share', palace: pres ? 'Presidential Palace' : 'Government House' });
 }
 const majority = () => Math.floor(((S && S.parl && S.parl.size) || 100) / 2) + 1;
@@ -558,7 +559,7 @@ async function afterElection() {
     SK.forEach(k => S.stats[k] = clamp(S.stats[k] + rnd(-4, 4)));
     S.ga = {}; GK.forEach(g => S.ga[g] = clamp(S.camp.symP[g] + 4));
     S.eventMods = zero(GK); S.lawMods = zero(GK); S.lawStat = zero(SK); S.lawCost = 0;
-    S.gdp = 100; S.debt = COUNTRY.debt; S.rate = COUNTRY.rate || .015; S.pc = 3; S.deck = shuffle(GOV_EVENTS.map(e => e.id));
+    S.gdp = 100; S.debt = COUNTRY.debt; S.rate = COUNTRY.rate || .015; S.pc = 3; S.deck = shuffle(Local.deckIds()); S.localDeck = 1;
     S.debtSoft = Math.max(80, COUNTRY.debt + 10); S.crisisAt = Math.max(120, COUNTRY.debt + 35);
     S.mil = { ...(COUNTRY.mil || { army: 30, air: 20, navy: 20 }), alliance: false };
     const milUp = (S.mil.army + S.mil.air + S.mil.navy) * .012;
@@ -805,9 +806,9 @@ async function turnStart() {
   let ev;
   if (debtPct() > (S.crisisAt || 120) && !(S.crisisTurn && S.turn - S.crisisTurn < 4)) { ev = DEBT_EVENT; S.crisisTurn = S.turn; }
   else {
-    if (!S.deck || !S.deck.length) S.deck = shuffle(GOV_EVENTS.map(e => e.id));
+    if (!S.deck || !S.deck.length) S.deck = shuffle(Local.deckIds());
     const id = S.deck.pop();
-    ev = GOV_EVENTS.find(e => e.id === id) || pick(GOV_EVENTS);
+    ev = Local.find(id) || pick(Local.events());
   }
   const k = await choiceModal({ ...ev, text: ev.text.replace(/\{NEIGHBOR\}/g, NEIGHBOR), mode: 'gov' });
   const before = Impact.snap();
@@ -833,7 +834,7 @@ async function endTurn() {
   if (UI.busy || S.pendingEvent) return; UI.busy = true; S.clk = 0;
   try {
     const a0 = approval(), r = simulateTurn(), a1 = approval();
-    r.msgs.push(...Money.step(r), ...TBills.step());
+    r.msgs.push(...Money.step(r), ...TBills.step(), ...Mega.step());
     say(a1 >= a0 ? 'Good news this half-year.' : 'Tough months. We must do better.');
     S.diploThisTurn = false;
     render();
@@ -842,6 +843,7 @@ async function endTurn() {
     render();
     await Paper.show(r, a0, approval(), w);
     await ceremonies();
+    await Mega.ceremony();
     if (S.scandalRisk > 0 && Math.random() < .12 * S.scandalRisk) {
       S.scandalRisk = 0; GK.forEach(g => { S.ga[g] = clamp(S.ga[g] - 6); S.eventMods[g] -= 3; }); S.pc = Math.max(0, S.pc - 2);
       news(`BRIBERY SCANDAL: secret gifts to the ${ROLE.title.toLowerCase()} exposed`);
@@ -1416,10 +1418,10 @@ function cityCard() {
     ${cityBar(camp)}
   </div>`;
 }
-const TABS = [['agenda', '📜 Manifesto'], ['team', '👥 Government'], ['money', '🏦 Money'], ['budget', '💰 Budget'], ['build', '🏗️ Build'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];
+const TABS = [['agenda', '📜 Manifesto'], ['team', '👥 Government'], ['money', '🏦 Money'], ['budget', '💰 Budget'], ['build', '🏗️ Build'], ['mega', '🚧 Megaprojects'], ['housing', '🏘️ Housing'], ['laws', '📜 Laws'], ['parl', '🏛️ Parliament'], ['defense', '🛡️ Defense'], ['people', '👥 People']];
 function renderGovern() {
   const ap = approval(), pp = partyById(S.player.party), inTerm = (S.turn - 1) % TT() + 1;
-  const tabHTML = { team: () => Team.html(), agenda: () => Manifesto.html(), money: () => Money.html(), budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
+  const tabHTML = { team: () => Team.html(), agenda: () => Manifesto.html(), money: () => Money.html(), mega: () => Mega.html(), budget: budgetHTML, build: buildHTML, housing: housingHTML, laws: lawsHTML, parl: parlHTML, defense: defenseHTML, people: peopleHTML }[UI.tab]();
   return `${cityCard()}${Assistant.card()}<div class="grid3 gov">
     <div class="card leader">
       <div class="portrait">${bubble()}${avatarSVG(S.player.look, mood(), 110, 'float')}</div>
@@ -1554,6 +1556,7 @@ const ACT = {
   diplo: () => diplomacy(),
   alliance: () => toggleAlliance(),
   endTurn: () => endTurn(),
+  mega: d => Mega.act(d.id),
   submitScore: () => submitCloud(),
   setCountry: d => { UI.setup.countryId = d.id; applyCountry(d.id); render(); },
   playAgain: () => { S = null; UI.speech = null; UI.screen = 'setup'; render(); },
@@ -1586,6 +1589,8 @@ function resume() {
     if (S.camp) { if (S.camp.rbP && S.camp.rbP[r] === undefined) S.camp.rbP[r] = 0; if (S.camp.rbO && S.camp.rbO[r] === undefined) S.camp.rbO[r] = 0; }
   });
   Drafter.register();
+  if (S.deck && !S.localDeck) { S.localDeck = 1; if (!Local.has(S.deck)) S.deck = shuffle(Local.deckIds()); }   // older saves: add the country's own events
+  if (typeof Mega !== 'undefined') Mega.init();
   if (S.online && S.online.gid) Net.ready().then(ok => { if (ok) Online.enter(S.online.gid); });
   if (!S.scale) S.scale = 1; if (!S.termTurns) S.termTurns = 8; if (!S.maxTerms) S.maxTerms = 2;
   if (S.stats && S.infl === undefined) World.init();
