@@ -834,7 +834,7 @@ async function endTurn() {
   if (UI.busy || S.pendingEvent) return; UI.busy = true; S.clk = 0;
   try {
     const a0 = approval(), r = simulateTurn(), a1 = approval();
-    r.msgs.push(...Money.step(r), ...TBills.step(), ...Mega.step());
+    r.msgs.push(...Money.step(r), ...TBills.step(), ...Mega.step(), ...Resorts.step());
     say(a1 >= a0 ? 'Good news this half-year.' : 'Tough months. We must do better.');
     S.diploThisTurn = false;
     render();
@@ -1557,6 +1557,7 @@ const ACT = {
   alliance: () => toggleAlliance(),
   endTurn: () => endTurn(),
   mega: d => Mega.act(d.id),
+  resort: d => Resorts.act(d.id),
   submitScore: () => submitCloud(),
   setCountry: d => { UI.setup.countryId = d.id; applyCountry(d.id); render(); },
   playAgain: () => { S = null; UI.speech = null; UI.screen = 'setup'; render(); },

@@ -73,12 +73,42 @@ const MEGA = [
     risks: ['weather', 'ground', 'supply', 'overrun', 'claim'],
     protest: 'Villimalé residents fear traffic and noise on their quiet island.',
     lesson: 'Marine works depend on the weather: the southwest monsoon can stop barges and piling for weeks. Good schedules plan for it.' },
+  { id: 'mv_addu', icon: '🌉', name: 'Addu City bridges & link road upgrade (Hithadhoo–Maradhoo–Feydhoo–Gan)', usd: .12, turns: 4, site: 'high', where: ['mv'],
+    why: 'Wider causeways and new bridges along the Addu link road, so buses, ambulances and freight move safely between the islands of Addu City and Gan airport.',
+    gain: { s: { economy: 2, health: 1 }, g: { farmers: 5, workers: 3 }, gdp: .2, growth: .02 },
+    risks: ['weather', 'ground', 'supply', 'overrun'],
+    protest: 'Fishers say the new causeway will block the channel their boats use.',
+    lesson: 'Causeways block water flow between lagoons; leaving openings (culverts or short bridges) keeps the lagoon healthy.' },
+  { id: 'mv_laamu', icon: '🌉', name: 'Laamu Atoll island bridges (Gan–Fonadhoo and neighbours)', usd: .08, turns: 4, site: 'farm', where: ['mv'],
+    why: 'Bridges join neighbouring islands so one hospital, one school and one harbour can serve them all — far cheaper than building everything on every island.',
+    gain: { s: { health: 2, education: 1, economy: 1 }, g: { farmers: 6, elderly: 2 }, gdp: .1, growth: .01 },
+    risks: ['weather', 'ground', 'supply', 'claim'],
+    protest: 'Some islanders worry that their island will lose its own school and clinic.',
+    lesson: 'Linking islands lets small populations share services — one of the biggest challenges of a country spread over 1,000+ islands.' },
   { id: 'mv_reclaim', icon: '🏝️', name: 'Land reclamation & new island city (Hulhumalé-style)', usd: 1.5, turns: 8, site: 'capital', where: ['mv'],
     why: 'Pumping sand from the lagoon builds new land, higher above the sea, for tens of thousands of homes, schools and parks.',
     gain: { s: { housing: 9, economy: 2 }, g: { youth: 6, workers: 3 }, gdp: .8, growth: .08, homes: 3 },
     risks: ['reef', 'weather', 'overrun', 'corrupt', 'claim'],
     protest: 'Divers and young activists say dredging will kill the reef and lagoon.',
     lesson: 'Reclamation gives land and safety from rising seas, but destroys the reef where the sand is taken. An honest EIA weighs both.' },
+  { id: 'mv_rasmale', icon: '🏝️', name: 'Reclaim Ras Malé — a new eco-city island', usd: 2, turns: 8, site: 'capital', where: ['mv'],
+    why: 'A large new island in North Malé Atoll, built higher above the sea, with homes, a fisheries hub and green spaces for families moving out of crowded Malé.',
+    gain: { s: { housing: 10, economy: 2, security: 2 }, g: { youth: 6, farmers: 3 }, gdp: .9, growth: .08, homes: 4 },
+    risks: ['reef', 'weather', 'overrun', 'demand', 'claim', 'corrupt'],
+    protest: 'Environmental groups say dredging sand will destroy a living reef system.',
+    lesson: 'New land is how a low-lying nation can stay above rising seas, but each reclamation uses a lagoon and its reef. The country must choose carefully where.' },
+  { id: 'mv_gulhi', icon: '🏗️', name: 'Reclaim Gulhifalhu — industrial island', usd: .45, turns: 5, site: 'capital', where: ['mv'],
+    why: 'New land for warehouses, boat yards and light industry, moving noisy work out of Malé and Hulhumalé.',
+    gain: { s: { economy: 3, housing: 1 }, g: { business: 5, workers: 3 }, gdp: .5, growth: .05 },
+    risks: ['reef', 'weather', 'overrun', 'claim'],
+    protest: 'Surfers and divers say a famous surf break and reef will disappear.',
+    lesson: 'Industrial land near the capital lowers the cost of doing business — and keeps heavy work away from homes.' },
+  { id: 'mv_island', icon: '🏘️', name: 'Expand a crowded outer island (reclamation for homes & harbour)', usd: .06, turns: 3, site: 'north', where: ['mv'],
+    why: 'Many inhabited islands have no room left for new homes. Reclaiming part of the lagoon gives plots for young families and a deeper harbour.',
+    gain: { s: { housing: 4 }, g: { farmers: 6, youth: 3 }, gdp: .05, growth: .01, homes: 2 },
+    risks: ['reef', 'weather', 'protest'],
+    protest: 'Some islanders want to keep the lagoon where children swim and fish.',
+    lesson: 'Island councils often ask for reclamation. Island land plans decide whether the new land goes to families, businesses or speculation.' },
   { id: 'mv_airport', icon: '🛫', name: 'New passenger terminal at Velana Airport', usd: 1, turns: 6, site: 'capital', where: ['mv'],
     why: 'A bigger terminal so more tourists can arrive — tourism brings most of the country\'s dollars.',
     gain: { s: { economy: 4 }, g: { business: 6, workers: 3 }, gdp: 1, growth: .1, reserves: 40 },
@@ -149,7 +179,7 @@ const Mega = (() => {
   // ---------- 1. feasibility ----------
   async function start(id) {
     const m = M(id); if (!m) return;
-    if (active().length >= 2) return toast('Two megaprojects are already running. Finish or cancel one first.', 'bad');
+    if (active().length >= 3) return toast('Three megaprojects are already running. Finish or cancel one first.', 'bad');
     if (st().list.some(p => p.id === id && p.phase !== 'cancelled' && p.phase !== 'shelved')) return toast('This project already exists.', 'bad');
     const fee = base(m) * .01;
     const k = await choiceModal({ icon: m.icon, title: `Start: ${m.name}?`, text: `<b>Step 1 — Feasibility study.</b> Engineers and economists check if the project makes sense: real cost, demand, best site, risks and the benefit–cost ratio. It takes one half-year and costs about <b>${usd(fee)}</b> (1% of the first estimate of ${usd(base(m))}).<br><br><i>Real lesson: skipping this step is the most common reason big projects fail.</i>`,
@@ -419,14 +449,14 @@ const Mega = (() => {
     const extra = COUNTRY.id === 'mv' ? '<p class="muted small">🇲🇻 A nuclear plant is not offered here: the Maldives has no grid big enough, no nuclear regulator and only sand islands a metre above the sea. Its megaprojects are about land, sea, ports and energy imports.</p>'
       : COUNTRY.id === 'de' ? '<p class="muted small">🇩🇪 Germany closed its last nuclear plants in 2023, so no nuclear plant is offered.</p>' : '';
     return `<div class="mega">
-      <p class="muted">Flagship projects take years and cost a large part of the budget. Launch one, then <b>monitor it closely</b>: progress vs plan, money vs budget, safety, quality and risks. You can run up to two at once.</p>
+      <p class="muted">Flagship projects take years and cost a large part of the budget. Launch one, then <b>monitor it closely</b>: progress vs plan, money vs budget, safety, quality and risks. You can run up to three at once.</p>
       ${list.length ? list.slice().reverse().map(card).join('') : ''}
       <h3>Start a new megaproject</h3>${extra}
       <div class="mg-pick">${av.map(m => {
         const used = list.some(p => p.id === m.id && !['cancelled', 'shelved'].includes(p.phase));
         return `<div class="mg-opt"><div class="mg-head"><span class="mg-ic">${m.icon}</span><div><b>${m.name}</b><small>≈ ${usd(base(m))} (${fmt(base(m) / S.gdp * 100, 1)}% of GDP) · ${m.turns / 2} years · ${(reg(m.site) || REGIONS[0]).name}</small></div></div><p>${m.why}</p>
-          <button class="btn small ${used || running >= 2 ? '' : 'primary'}" data-act="mega" data-id="start|${m.id}" ${used || running >= 2 ? 'disabled' : ''}>${used ? 'Already started' : 'Feasibility study →'}</button></div>`;
-      }).join('')}</div></div>`;
+          <button class="btn small ${used || running >= 3 ? '' : 'primary'}" data-act="mega" data-id="start|${m.id}" ${used || running >= 3 ? 'disabled' : ''}>${used ? 'Already started' : 'Feasibility study →'}</button></div>`;
+      }).join('')}</div>${typeof Resorts !== 'undefined' && COUNTRY.id === 'mv' ? Resorts.html() : ''}</div>`;
   }
   return { init, step, html, act, ceremony, alerts, avail, active, MEGA };
 })();

@@ -99,7 +99,11 @@ Open the **🚧 Megaprojects** tab to launch a flagship project. Each one goes t
 
 On opening, a ceremony compares time, cost and quality with the plan, and the project keeps adding to growth, energy and services.
 
-Projects depend on the country: nuclear plants, high-speed rail, metros, dams, offshore wind, new cities and irrigation where they make sense; in the **Maldives** the Greater Malé sea bridge, land reclamation, a new Velana terminal, the Gulhifalhu port, coastal protection, island solar and a waste-to-energy plant (no nuclear plant — and Germany has none since its 2023 phase-out). Costs are rough game estimates.
+Projects depend on the country: nuclear plants, high-speed rail, metros, dams, offshore wind, new cities and irrigation where they make sense; in the **Maldives** bridges (Greater Malé sea bridge, Addu City link road, Laamu island bridges), island reclamation (Hulhumalé-style city, Ras Malé eco-city, Gulhifalhu industrial island, expanding a crowded outer island), a new Velana terminal, the Gulhifalhu port, coastal protection, island solar and a waste-to-energy plant (no nuclear plant — and Germany has none since its 2023 phase-out). Costs are rough game estimates.
+
+### 🏝️ Island resorts (Maldives)
+
+Below the megaprojects, lease uninhabited islands for resorts: pick an atoll and a size (40, 100 or 200 villas), then choose open international bidding (best fee, takes a half-year), a joint venture with the state tourism company, or a direct award (fast and cheap, but scandal risk and the developer may never build). Set reef protection and local-hiring rules. The developer pays for construction; once open, the resort pays rent and tourism taxes every half-year, brings dollars into the reserves and creates jobs. Stalled leases can be revoked.
 
 ## Each country is different
 
@@ -258,6 +262,7 @@ tender.js         full tender document review & evaluation
 school.js         Finance School lessons & quizzes
 tbills.js         Treasury bill issuance, subscriptions, rollover
 realcamp.js       election rules, running mate, polls, campaign finance, runoff
+resorts.js        Maldives island resort leasing
 mega.js           megaprojects: feasibility, EIA, financing, tender, monitored construction
 local.js          country-specific voter groups and events (farmers' protests, fishers, strikes…)
 manifest.webmanifest, icons/  app name and icons

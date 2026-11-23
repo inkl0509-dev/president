@@ -835,3 +835,7 @@ b.warn { color: #fbbf24; }
 .mg-pick .mg-opt p { flex: 1; font-size: 13px; opacity: .85; }
 @media (max-width: 600px) { .mg-risk th:nth-child(2), .mg-risk td:nth-child(2) { white-space: nowrap; } }
 .mega .lesson, .m-body .lesson { background: rgba(37,99,235,.12); border-radius: 8px; padding: 8px 10px; }
+.rs-form { margin-top: 10px; }
+.rs-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 8px 0; }
+.rs-row label { display: flex; flex-direction: column; font-size: 12px; gap: 3px; }
+.rs-row select { min-height: 40px; border-radius: 8px; padding: 0 8px; background: #0f172a; color: inherit; border: 1px solid rgba(148,163,184,.35); }
