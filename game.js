@@ -144,6 +144,7 @@ function news(t) { S.news.unshift(t); S.news = S.news.slice(0, 14); }
 function say(t) { UI.speech = t; }
 function toast(msg, kind = '') {
   const el = document.createElement('div'); el.className = 'toast ' + kind; el.textContent = msg;
+  if (kind === 'bad' && /⭐|political capital/i.test(msg)) { el.textContent = msg + ' — tap to see how to earn ⭐'; el.classList.add('st-toast'); el.onclick = () => Stars.open(); }
   $('#toasts').appendChild(el);
   setTimeout(() => el.classList.add('out'), 2300); setTimeout(() => el.remove(), 2800);
 }
@@ -1093,6 +1094,7 @@ function renderTitle() {
     <div class="menu">
       ${saved ? `<button class="btn primary big" data-act="continue">▶ Continue as ${esc(saved.player.name)}</button>` : ''}
       <button class="btn ${saved ? '' : 'primary'} big" data-act="newGame">✨ New game</button>
+      <button class="btn big ghost" data-act="guide">📖 How to play & tips</button>
       <button class="btn big" data-act="online">🌐 Online multiplayer</button>
       <button class="btn big ghost" data-act="school">📘 Finance School</button>
       ${PWA.canShow() ? `<button class="btn big ghost ${PWA.hasPrompt() ? 'glow' : ''}" data-act="install">📲 Install app</button>` : ''}
@@ -1132,7 +1134,7 @@ function renderSetup() {
         <div class="qual-grid">${Object.entries(QUALS).map(([k, q]) => `<button class="qual ${(su.qual || 'teacher') === k ? 'on' : ''}" data-act="setQual" data-id="${k}"><span>${q.icon}</span><b>${q.name}</b><small>${q.perk}</small><em>${q.knows.length ? 'Knows: ' + q.knows.map(f => QFIELDS[f]).join(', ') : 'Will learn all key terms'}</em></button>`).join('')}</div>
         <div class="lbl">Look</div>
         ${swatches('skin', LOOKS.skin)}${swatches('hair', LOOKS.hair)}${swatches('style', LOOKS.style)}${swatches('suit', LOOKS.suit)}${swatches('tie', LOOKS.tie)}
-        <div class="row-end"><button class="btn ghost" data-act="home">Back</button><button class="btn primary big" data-act="startGame">Launch campaign →</button></div>
+        <div class="row-end"><button class="btn ghost" data-act="home">Back</button><button class="btn ghost" data-act="guide">📖 How to play</button><button class="btn primary big" data-act="startGame">Launch campaign →</button></div>
       </div>
     </div></div>`;
 }
@@ -1290,7 +1292,7 @@ function housingHTML() {
 function lawsHTML() {
   const promisedLaws = S.promises.map(p => PROMISES[p.g].law);
   return `<div class="dr-cta"><div><b>✍️ Write your own bill</b><small>Choose what the law does; your assistant helps you draft it, estimates the cost and counts the votes.</small></div><button class="btn primary" data-act="draftBill" ${S.lawThisTurn || S.pendingEvent ? 'disabled' : ''}>Open drafting studio</button></div>
-  <p class="muted small">One bill per half-year. ⭐ ${S.pc} political capital. ${majority()} of ${S.parl.size || 100} votes needed — see the 🏛️ Parliament tab.</p>
+  <p class="muted small">One bill per half-year. <span class="st-link" role="button" data-act="stars">⭐ ${S.pc} political capital</span>. ${majority()} of ${S.parl.size || 100} votes needed — see the 🏛️ Parliament tab.</p>
   <div class="laws">${LAWS.filter(L => !L.custom || (S.customLaws || []).some(c => c.law.id === L.id)).map(L => {
     const passed = S.laws.includes(L.id), can = !passed && !S.lawThisTurn && S.pc >= L.pc && !S.pendingEvent;
     const ey = passed ? 0 : expectedYes(L);
@@ -1381,7 +1383,7 @@ function cityBar(camp) {
       <button class="btn primary cvb-end" data-act="endWeek">${c.week === c.weeks ? 'Election Day 🗳️' : 'End week →'}</button></div>`;
   }
   return `<div class="cv-bar">
-    ${Clock.html()}<div class="cvb-info"><b>⭐ ${S.pc} PC</b></div>
+    ${Clock.html()}<button class="cvb-info st-btn" data-act="stars" title="How to earn political capital"><b>⭐ ${S.pc} PC</b><small>how to earn?</small></button>
     <button class="cvb" data-act="cabinet" ${S.pendingEvent ? 'disabled' : ''}><span>👔</span>Cabinet<small>${S.cabinetDone && S.cabinetDone.turn === S.turn ? 'held' : 'briefings'}</small></button>
     <button class="cvb ${Experts.urgent().length ? 'alert' : ''}" data-act="experts" ${S.pendingEvent ? 'disabled' : ''} title="Ask economists, the central bank, the IMF, business and unions what to do"><span>🧠</span>Experts<small>${Experts.urgent().length ? Experts.urgent().length + ' issue' + (Experts.urgent().length > 1 ? 's' : '') : 'advice'}</small></button>
     <button class="cvb ${Advisers.urgent().length ? 'alert' : ''}" data-act="advisers" ${S.pendingEvent ? 'disabled' : ''} title="Your legal counsel, physician, foreign policy adviser, press secretary and more"><span>🧑‍💼</span>Advisers<small>${Advisers.urgent().length ? Advisers.urgent().length + ' want to see you' : 'lawyer · doctor · more'}</small></button>
@@ -1441,7 +1443,7 @@ function renderGovern() {
       <div class="party-chip" style="--pc:${pp.color}">${pp.name}</div>${Qual.badge()}
       <div class="ring" style="--v:${ap};--c:${approvalColor(ap)}"><div><b>${fmt(ap)}%</b><small>approval</small></div></div>
       <div class="kv"><span>Term</span><b>${S.term} of ${MAXT()} · half-year ${inTerm}/${TT()}</b></div>
-      <div class="kv"><span>Political capital</span><b>⭐ ${S.pc}</b></div>
+      <div class="kv"><span>Political capital</span><b>⭐ ${S.pc} <button class="btn small ghost" data-act="stars">How to earn</button></b></div>
       <div class="kv"><span>GDP</span><b>${bigMoney(gdpReal())} ${S.lastGrowth !== undefined ? `<em class="${S.lastGrowth >= 0 ? 'up' : 'down'}">${sign(S.lastGrowth)}%</em>` : ''}</b></div>
       <div class="kv"><span>Debt</span><b class="${debtPct() > (S.debtSoft || 80) + 20 ? 'bad' : ''}">${fmt(debtPct())}% of GDP</b></div>
       <div class="kv"><span>Parliament</span><b class="${coalitionSeats() >= majority() ? 'good' : 'bad'}">${coalitionSeats()}/${S.parl.size || 100} seats</b></div>
@@ -1543,13 +1545,15 @@ const ACT = {
   glossary: d => Qual.glossary(d.id),
   targets: () => Targets.details(),
   advisers: () => Advisers.office(),
+  stars: () => Stars.open(),
   presser: () => Presser.run(),
   qtime: () => QTime.run(),
   oil: d => Oil.act(d.id),
   adv: d => Advisers.act(d.id),
   look: d => { UI.setup.look[d.k] = d.v; render(); },
   randomLook: () => { UI.setup.look = randomLook(); render(); },
-  startGame: () => newGame(),
+  startGame: () => Guide.seen() ? newGame() : Guide.open(true, () => newGame()),
+  guide: () => Guide.open(),
   region: d => { UI.view = 'city'; if (S.phase === 'govern' && !['build', 'housing'].includes(UI.tab)) UI.tab = 'build'; UI.region = d.id; render(); if (S.phase === 'campaign' && S.online) Online.pushLive({ region: d.id, act: 'Touring' }); },
   camp: d => campAction(d.id),
   endWeek: () => endWeek(),
@@ -1590,6 +1594,8 @@ function openMenu() {
     <button class="choice" id="mn-resume"><b>▶ Resume</b></button>
     <button class="choice" id="mn-title"><b>🏠 Save & go to title screen</b></button>
     <button class="choice" id="mn-sound"><b>🔊 Sound & music</b><span class="fx">Sound effects ${Sound.pref().fx ? 'on' : 'off'} · music ${Sound.pref().music ? 'on' : 'off'}</span></button>
+    <button class="choice" id="mn-guide"><b>📖 How to play & tips</b><span class="fx">Winning the election, campaign money and the spending limit, governing</span></button>
+    <button class="choice" id="mn-stars"><b>⭐ How to earn stars</b><span class="fx">Political capital: what earns it, what costs it, what it buys</span></button>
     <button class="choice" id="mn-gloss"><b>📖 Key terms glossary</b><span class="fx">GDP, deficit, debt, inflation, reserves, majority… explained simply</span></button>
     <button class="choice" id="mn-school"><b>📘 Finance School</b><span class="fx">Lessons & quizzes: T-bills, currency swaps, bonds, reserves, inflation…</span></button>
     <button class="choice" id="mn-assist"><b>🧭 Assistant mode: ${Assistant.on() ? 'ON' : 'OFF'}</b><span class="fx">${Assistant.on() ? 'Tap to hide the Chief of Staff and all guidance' : 'Tap to get step-by-step guidance on running the country'}</span></button>
@@ -1597,6 +1603,8 @@ function openMenu() {
     ${S && S.phase !== 'over' ? '<button class="choice" id="mn-quit"><b>🗑️ Abandon this game</b><span class="fx">Deletes your saved progress</span></button>' : ''}</div>`);
   $('#mn-resume', m).onclick = closeModal;
   $('#mn-sound', m).onclick = () => { closeModal(); Sound.panel(); };
+  $('#mn-guide', m).onclick = () => { closeModal(); Guide.open(); };
+  $('#mn-stars', m).onclick = () => { closeModal(); Stars.open(); };
   $('#mn-gloss', m).onclick = () => { closeModal(); Qual.glossary(); };
   $('#mn-school', m).onclick = () => { closeModal(); School.open(); };
   $('#mn-assist', m).onclick = () => { closeModal(); Assistant.set(!Assistant.on()); };

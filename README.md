@@ -123,6 +123,14 @@ The **Advisers** button in the office opens your personal team (separate from mi
 
 A red dot means an adviser wants to see you; the assistant reminds you too. Legal answers are simplified explanations for learning.
 
+## 📖 How to play & tips
+
+Shown once before your first game ("Before you start"), and any time from the title screen, the setup screen or ☰ → How to play. Five tabs: **How to play** (the flow from candidate to retirement), **Win the election** (how the vote is decided in your country, what each campaign action does and costs, promises, attack-ad backfire, the debate, running mates), **Campaign money** (start $30M, +$3M a week, fundraisers +$12M, the legal spending limit — $45M, $60M in the US — and what happens if you overspend or take the tycoon's illegal donation: the post-election audit, a fine and scandal risk), **Governing tips** (cabinet, budget and debt crisis, targets, the 25% impeachment line, tenders, advisers, press) and **Stars**.
+
+## ⭐ Political capital (stars)
+
+Tap any ⭐ counter (or ☰ → How to earn stars) for the explainer. Earn stars: ⭐+2 every half-year (+1 if approval is above 60%; turn income stops at 12), ⭐+2 per national target achieved, ⭐+1 per Finance School lesson passed in government, ⭐+2 on re-election, ⭐+2 for the Lawyer qualification, ⭐+1 for suspending a corrupt official on a megaproject, and refunds when expert advice fails. Shady donations, crony contracts and blaming the last government give quick stars but raise scandal risk. When you don't have enough stars, the warning is tappable, and the assistant suggests ways to earn more when you are low.
+
 ## 🔊 Sound
 
 All sounds are synthesised live with the Web Audio API — no audio files, so they work offline and in the installed app. Effects: button clicks, tab switches, a chime at the end of each turn, success and warning tones, coins for money coming in, a drum roll as election results come in, a fanfare and applause for victories and new laws, crowd cheers at rallies, camera shutters at press conferences, the Speaker's gavel at question time, and alarms for spills or no-confidence motions. Optional calm background music (it turns darker when approval is low). Use the 🔊 button in the top bar or ☰ → Sound & music; settings are remembered.
@@ -326,6 +334,8 @@ qa.js             press conferences and parliamentary question time (built from 
 oil.js            oil & gas exploration, contracts and the wealth fund
 debateq.js        larger debate question pool, country questions, no repeats
 sound.js          synthesised sound effects and background music
+stars.js          the political capital explainer
+guide.js          how to play, election tips, campaign money rules
 anthem.js         anthems and ceremonial music for state visits
 cabtalk.js        cabinet discussion, delegated decisions and the vice president's follow-up
 mega.js           megaprojects: feasibility, EIA, financing, tender, monitored construction
