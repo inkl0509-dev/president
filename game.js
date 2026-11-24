@@ -90,7 +90,8 @@ const NAT = Object.fromEntries(GK.map(g => [g, REGIONS.reduce((s, r) => s + r.mi
 // ---------- state ----------
 let S = null;
 const UI = {
-  screen: 'title', region: 'capital', view: 'office', pin: true, tab: 'budget', speech: null, busy: false,
+  pin: (() => { try { const v = localStorage.getItem('president.pin'); if (v !== null) return v === '1'; } catch (e) { } return window.matchMedia && matchMedia('(max-width: 760px)').matches ? false : undefined; })(),
+  screen: 'title', region: 'capital', view: 'office', tab: 'budget', speech: null, busy: false,
   walkFrom: null, revealed: 0, cloud: null,
   setup: { name: '', country: 'Republic of Veloria', party: 'prog', countryId: 'veloria', qual: 'teacher',
     look: { skin: '#e0ac69', hair: '#1f1308', style: 'short', suit: '#1e293b', tie: '#b91c1c' } },
@@ -1427,7 +1428,8 @@ function cityCard() {
   const office = !camp && UI.view === 'office';
   const title = office ? `<b>🏛️ Office of the ${ROLE.title}</b><span class="muted small">${myFlag()} ${esc(S.country)} · ${turnLabel()} · approval ${fmt(approval())}%</span>`
     : `<b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${people < .1 ? Math.round(people * 1000).toLocaleString('en') + 'k' : fmt(people, 1) + 'M'} people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span>`;
-  return `<div class="card citycard ${UI.pin !== false ? 'pin' : ''} ${UI.mini ? 'mini' : ''}">
+  const phone = window.matchMedia && matchMedia('(max-width: 760px)').matches;
+  return `<div class="card citycard ${UI.pin !== false || phone ? 'pin' : ''} ${UI.pin === false ? 'nostick' : ''} ${UI.mini ? 'mini' : ''}">
     <div class="cv-head"><div class="cv-title">${title}</div><button class="pinbtn" data-act="mini" title="${UI.mini ? 'Show' : 'Hide'} the animated scene">${UI.mini ? '🔽' : '🔼'}</button><button class="pinbtn" data-act="pin" title="Keep the panel pinned at the top">${UI.pin !== false ? '📌' : '📍'}</button>
       <div class="moods">${GK.filter(g => r.mix[g] > 0).map(moodChip).join('')}</div>${regionPicker()}</div>
     <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">${office ? 'your office · aides bring papers · the TV shows the latest news' : 'drag to explore · hover people &amp; buildings'}</div></div>
@@ -1562,7 +1564,7 @@ const ACT = {
   afterElection: () => afterElection(),
   tab: d => { UI.tab = d.id; render(); if (d.scroll) { const t = $('.tabs'), card = $('.citycard'); if (t) { const off = (UI.pin !== false && card ? card.offsetHeight : 0) + 70; window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - off, behavior: 'smooth' }); } } },
   office: () => { UI.view = 'office'; render(); },
-  pin: () => { UI.pin = UI.pin === false; render(); },
+  pin: () => { UI.pin = UI.pin === false; try { localStorage.setItem('president.pin', UI.pin ? '1' : '0'); } catch (e) { } render(); },
   foreign: () => Diplomacy.menu(),
   buildPick: () => buildPick(),
   cabinet: () => Cabinet.meeting(),

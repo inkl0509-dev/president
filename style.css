@@ -1022,3 +1022,14 @@ b.warn { color: #fbbf24; }
 }
 
 .clk-short { display: none; }
+
+/* ---------- phones: smaller action buttons ---------- */
+@media (max-width: 760px) {
+  .citycard .cv-bar, .citycard.pin .cv-bar { gap: .25rem; grid-template-columns: repeat(5, 1fr); }
+  .citycard .cv-bar .cvb-end { min-height: 40px !important; font-size: .9rem !important; padding: .3rem; }
+  .citycard .cv-bar .cvb { min-height: 42px; padding: .15rem .1rem; font-size: .6rem; border-radius: 8px; }
+  .citycard .cv-bar .cvb span { font-size: 1rem !important; line-height: 1.1; }
+  .citycard .cv-bar .cvb small { display: none; }
+}
+@media (max-width: 380px) { .citycard .cv-bar, .citycard.pin .cv-bar { grid-template-columns: repeat(4, 1fr); } }
+.citycard.pin.nostick { position: relative; top: auto; box-shadow: none; }
