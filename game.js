@@ -116,6 +116,13 @@ const Clock = {
       <div class="clk-bar">${'<i class="tick"></i>'.repeat(5)}<i class="fill" id="clk-f" style="width:${(S.clk || 0) / (SEC_PER_MONTH * 6) * 100}%"></i></div>
       <div class="clk-s">${b(0, '⏸', 'Pause')}${b(1, '▶', 'Normal: 2 min = 1 month')}${b(3, '⏩', 'Fast: 40 s = 1 month')}</div></div>`;
   },
+  // compact controls for the city panel header; the date itself is on the office wall
+  mini() {
+    const sp = this.speed(), b = (v, i, t) => `<button class="${sp === v ? 'on' : ''}" data-act="speed" data-id="${v}" title="${t}">${i}</button>`;
+    return `<div class="clock mini ${sp ? '' : 'paused'}" id="clock" title="Game time: 2 minutes = 1 month"><div class="clk-s">${b(0, '⏸', 'Pause')}${b(1, '▶', 'Normal: 2 min = 1 month')}${b(3, '⏩', 'Fast: 40 s = 1 month')}</div></div>`;
+  },
+  // time of day on the office clock: each month runs from 08:00 to 18:00
+  hm() { const p = ((S.clk || 0) % SEC_PER_MONTH) / SEC_PER_MONTH, mins = Math.floor(8 * 60 + p * 600); return [Math.floor(mins / 60), mins % 60]; },
 };
 function paintClock() {
   const m = $('#clk-m'), f = $('#clk-f'), c = $('#clock');
@@ -204,8 +211,22 @@ function avatarSVG(L, m = 0, size = 120, cls = '') {
 function bubble() { return UI.speech ? `<div class="bubble">${esc(UI.speech)}</div>` : ''; }
 
 // ---------- modals ----------
-function modal(html, wide = false) { const m = $('#modal'); m.innerHTML = `<div class="modal-card ${wide === true ? 'wide' : wide || ''}">${html}</div>`; m.classList.add('open'); return m; }
-function closeModal() { const m = $('#modal'); m.classList.remove('open'); m.innerHTML = ''; }
+// A window marked "keep" (a decision the game is waiting for) is never lost: if another window
+// (menu, sound, help…) opens on top of it, it is set aside and comes back when that window closes.
+let keptCard = null;
+function modal(html, wide = false) {
+  const m = $('#modal'), cur = m.querySelector('.modal-card');
+  if (cur && m.classList.contains('open') && cur.classList.contains('keep') && cur !== keptCard) { keptCard = cur; cur.remove(); }
+  m.querySelectorAll('.modal-card').forEach(c => c.remove());
+  m.insertAdjacentHTML('beforeend', `<div class="modal-card ${wide === true ? 'wide' : wide || ''}">${html}</div>`); m.classList.add('open'); return m;
+}
+function closeModal() {
+  const m = $('#modal'), cur = m.querySelector('.modal-card');
+  if (cur && cur === keptCard) keptCard = null;             // the kept decision itself was answered
+  m.innerHTML = '';
+  if (keptCard && cur && !cur.classList.contains('keep')) { const k = keptCard; keptCard = null; m.appendChild(k); m.classList.add('open'); return; }
+  m.classList.remove('open');
+}
 function infoModal(icon, title, html, btn = 'Continue') {
   return new Promise(res => {
     const m = modal(`<div class="m-icon">${icon}</div><h2>${title}</h2><div class="m-body">${html}</div><button class="btn primary big" id="m-ok">${btn}</button>`);
@@ -237,7 +258,7 @@ function fxChips(fx, mode) {
 function choiceModal({ icon, title, text, choices, mode }) {
   return new Promise(res => {
     const m = modal(`<div class="m-icon">${icon}</div><h2>${title}</h2><p class="m-body">${text}</p>
-      <div class="choices">${choices.map((c, i) => `<button class="choice" data-i="${i}" ${c.disabled ? 'disabled' : ''}><b>${c.t}</b><span class="fx">${c.note !== undefined ? c.note : fxChips(c.fx || {}, mode)}</span></button>`).join('')}</div>`);
+      <div class="choices">${choices.map((c, i) => `<button class="choice" data-i="${i}" ${c.disabled ? 'disabled' : ''}><b>${c.t}</b><span class="fx">${c.note !== undefined ? c.note : fxChips(c.fx || {}, mode)}</span></button>`).join('')}</div>`, mode === 'gov' ? 'keep' : false);
     m.querySelectorAll('.choice').forEach(b => b.onclick = () => { closeModal(); res(+b.dataset.i); });
   });
 }
@@ -805,8 +826,11 @@ function applyGovFx(fx) {
   if (fx.homes) for (const r in fx.homes) S.housing.stock[r] += fx.homes[r];
   if (fx.scandal) S.scandalRisk += fx.scandal;
 }
+let turnStartRun = 0;
 async function turnStart() {
   if (!S || S.phase !== 'govern' || !S.pendingEvent) return;
+  const run = ++turnStartRun;
+  try {
   Qual.onGovern();
   await Targets.choose();
   await CabTalk.followUp();
@@ -817,11 +841,17 @@ async function turnStart() {
     const id = S.deck.pop();
     ev = Local.find(id) || pick(Local.events());
   }
+  S.evNow = ev.id || 'debt';
   const k = await choiceModal({ ...ev, text: ev.text.replace(/\{NEIGHBOR\}/g, NEIGHBOR), mode: 'gov' });
+  if (run !== turnStartRun || !S.pendingEvent) return;     // an older, replaced window answered late
   const before = Impact.snap();
   applyGovFx(ev.choices[k].fx); news(ev.choices[k].news || ev.title);
   S.pendingEvent = false; save(); render();
   Impact.show(`${ev.title}: ${ev.choices[k].t.replace(/<[^>]+>/g, '').slice(0, 60)}`, before, { lesson: 'Events test leaders. Every choice has winners and losers — the art is deciding who must be protected and explaining why.' });
+  } catch (e) {
+    console.error(e); S.pendingEvent = false; save(); render();
+    toast('The event could not be shown — skipped. You can carry on governing.', 'bad');
+  }
 }
 function advisorTip() {
   const lowG = [...GK].sort((a, b) => S.ga[a] - S.ga[b])[0];
@@ -867,8 +897,9 @@ async function endTurn() {
       await infoModal('🗳️', 'Election season!', `<p>Your term is ending. <b>${esc(S.opp.name)}</b> of the ${partyById(S.opp.party).name} wants your job. Parliament is up for election too.</p><p>Your approval of <b>${fmt(ap)}%</b> sets your starting position. Projects you built help you in those regions. Broken promises will cost you.</p>`, 'Start re-election campaign');
       startCampaign(true); say('Four more years? Let\'s earn it.'); save(); render(); return;
     }
-    S.turn++; S.lawThisTurn = false; S.pendingEvent = true; save(); render();
-    await turnStart(); scrollToCity();
+    S.turn++; S.lawThisTurn = false; S.pendingEvent = true; save();
+    UI.busy = false; render();
+    turnStart().then(scrollToCity);   // not awaited, so a lost window can never leave the game stuck as busy
   } finally { UI.busy = false; }
 }
 async function impeachment(ap) {
@@ -962,7 +993,7 @@ async function loadCloud() {
 function chip(icon, text, cls = '') { return `<span class="tchip ${cls}">${icon} ${text}</span>`; }
 function renderTop() {
   const t = $('#topstats'), tc = $('#topclock');
-  if (tc) { const on = S && S.phase === 'govern' && S.ga && UI.screen === 'govern'; tc.innerHTML = on ? Clock.html() : ''; tc.classList.toggle('on', !!on); }
+  if (tc) { const on = false; /* the date now hangs on the office wall (calendar + clock) */ tc.innerHTML = on ? Clock.html() : ''; tc.classList.toggle('on', !!on); }
   if (!S || UI.screen === 'title' || UI.screen === 'setup' || UI.screen === 'hall' || UI.screen === 'online') { t.innerHTML = ''; return; }
   if (S.phase === 'campaign' && S.camp) {
     const c = S.camp;
@@ -1386,7 +1417,7 @@ function cityBar(camp) {
       <button class="cvb" data-act="manifesto"><span>📜</span>Manifesto<small>${(c.newPledges || []).length}/3 pledges</small></button></div>`
   }
   return `<div class="cv-bar">
-    <button class="btn primary cvb-end" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish →' : 'End term →') : 'End half-year →'}</button>
+    ${S.pendingEvent && !UI.busy ? `<button class="btn primary cvb-end" data-act="reopenEvent" title="A decision is waiting">📰 Decide the event first →</button>` : ''}<button class="btn primary cvb-end" data-act="endTurn" ${S.pendingEvent ? 'disabled hidden' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish →' : 'End term →') : 'End half-year →'}</button>
     <button class="cvb-info st-btn" data-act="stars" title="How to earn political capital"><b>⭐ ${S.pc} PC</b><small>how to earn?</small></button>
     <button class="cvb" data-act="cabinet" ${S.pendingEvent ? 'disabled' : ''}><span>👔</span>Cabinet<small>${S.cabinetDone && S.cabinetDone.turn === S.turn ? 'held' : 'briefings'}</small></button>
     <button class="cvb ${Experts.urgent().length ? 'alert' : ''}" data-act="experts" ${S.pendingEvent ? 'disabled' : ''} title="Ask economists, the central bank, the IMF, business and unions what to do"><span>🧠</span>Experts<small>${Experts.urgent().length ? Experts.urgent().length + ' issue' + (Experts.urgent().length > 1 ? 's' : '') : 'advice'}</small></button>
@@ -1430,7 +1461,7 @@ function cityCard() {
     : `<b>${camp ? '📣 Campaign trail:' : '🏙️'} ${r.city[2]}</b><span class="muted small">${r.name} · ${people < .1 ? Math.round(people * 1000).toLocaleString('en') + 'k' : fmt(people, 1) + 'M'} people · ${camp ? 'support for you' : 'mood'} ${ra >= 60 ? '😊' : ra < 40 ? '😠' : '😐'} ${fmt(ra)}%</span>`;
   const phone = window.matchMedia && matchMedia('(max-width: 760px)').matches;
   return `<div class="card citycard ${UI.pin !== false || phone ? 'pin' : ''} ${UI.pin === false ? 'nostick' : ''} ${UI.mini ? 'mini' : ''}">
-    <div class="cv-head"><div class="cv-title">${title}</div><button class="pinbtn" data-act="mini" title="${UI.mini ? 'Show' : 'Hide'} the animated scene">${UI.mini ? '🔽' : '🔼'}</button><button class="pinbtn" data-act="pin" title="Keep the panel pinned at the top">${UI.pin !== false ? '📌' : '📍'}</button>
+    <div class="cv-head"><div class="cv-title">${title}</div>${!camp ? Clock.mini() : ''}<button class="pinbtn" data-act="mini" title="${UI.mini ? 'Show' : 'Hide'} the animated scene">${UI.mini ? '🔽' : '🔼'}</button><button class="pinbtn" data-act="pin" title="Keep the panel pinned at the top">${UI.pin !== false ? '📌' : '📍'}</button>
       <div class="moods">${GK.filter(g => r.mix[g] > 0).map(moodChip).join('')}</div>${regionPicker()}</div>
     <div class="cv-wrap"><canvas id="city" aria-label="Animated view of ${r.city[2]}"></canvas><div id="cv-tip"></div><div class="cv-hint">${office ? 'your office · aides bring papers · the TV shows the latest news' : 'drag to explore · hover people &amp; buildings'}</div></div>
     ${cityBar(camp)}
@@ -1510,6 +1541,7 @@ function renderHall() {
 }
 
 function render() {
+  if (UI.screen !== 'govern') { keptCard = null; const kc = document.querySelector('#modal.open .modal-card.keep'); if (kc) closeModal(); }
   const app = $('#app');
   document.body.dataset.screen = UI.screen;
   let html = '';
@@ -1585,6 +1617,7 @@ const ACT = {
   diplo: () => diplomacy(),
   alliance: () => toggleAlliance(),
   endTurn: () => endTurn(),
+  reopenEvent: () => { if (S.pendingEvent && !$('#modal.open') && !UI.busy) { if (S.deck && S.evNow && Local.find(S.evNow) && !S.deck.includes(S.evNow)) S.deck.push(S.evNow); turnStart(); } },
   mega: d => Mega.act(d.id),
   resort: d => Resorts.act(d.id),
   submitScore: () => submitCloud(),

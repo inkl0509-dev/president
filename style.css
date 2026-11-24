@@ -1033,3 +1033,6 @@ b.warn { color: #fbbf24; }
 }
 @media (max-width: 380px) { .citycard .cv-bar, .citycard.pin .cv-bar { grid-template-columns: repeat(4, 1fr); } }
 .citycard.pin.nostick { position: relative; top: auto; box-shadow: none; }
+.cvb-end[hidden] { display: none !important; }
+.clock.mini { padding: .1rem .25rem; margin-left: auto; margin-right: .3rem; background: transparent; border: 0; }
+.clock.mini .clk-s button { min-width: 36px; min-height: 36px; }

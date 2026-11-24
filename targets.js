@@ -55,7 +55,7 @@ const Targets = (() => {
       const m = modal(`<div class="m-icon">🎯</div><h2>Set your government's targets</h2>
         <p class="m-body">Real governments publish measurable goals so people can judge them. A <b>budget surplus</b> is required. Choose up to 3 more. A target counts as <b>achieved</b> when it is met for a full year (two half-years in a row): ⭐+2 and more public trust. Missed targets at the end of the term cost trust.</p>
         <div class="tg-pick">${avail.map(t => { const g = t.setup ? t.setup() : null, o = { goal: g }; return `<button class="tg-opt ${pre.has(t.id) ? 'on' : ''} ${t.must ? 'must' : ''}" data-id="${t.id}" ${t.must ? 'disabled' : ''}><span>${t.icon}</span><b>${t.name(o)}</b><small>now: ${t.show(t.val())} ${t.ok(t.val(), o) ? '✓' : ''}</small></button>`; }).join('')}</div>
-        <button class="btn primary big" id="m-ok">Publish targets</button>`, 'wide');
+        <button class="btn primary big" id="m-ok">Publish targets</button>`, 'wide keep');
       m.querySelectorAll('.tg-opt:not(.must)').forEach(b => b.onclick = () => {
         const on = m.querySelectorAll('.tg-opt.on:not(.must)').length;
         if (!b.classList.contains('on') && on >= 3) return toast('Up to 3 targets besides the budget.', 'bad');

@@ -125,7 +125,7 @@ A red dot means an adviser wants to see you; the assistant reminds you too. Lega
 
 ## 📱 Layout
 
-The game clock (month and year, pause / play / fast) sits in the top bar. The **End half-year** (or **End week**) button is the first, full-width button under the city view, and on phones all action buttons are shown in a compact grid — nothing hides off the side of the screen. On phones the city panel scrolls up with the page; tap 📍 to pin it to the top instead (remembered).
+The date hangs on the wall of the president's office: a calendar (month, year, and the days of the month passing) and a clock (each month runs from 08:00 to 18:00). Pause / play / fast buttons are in the city panel's header. The **End half-year** (or **End week**) button is the first, full-width button under the city view, and on phones all action buttons are shown in a compact grid — nothing hides off the side of the screen. On phones the city panel scrolls up with the page; tap 📍 to pin it to the top instead (remembered).
 
 ## 📖 How to play & tips
 

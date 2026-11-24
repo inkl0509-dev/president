@@ -90,7 +90,7 @@ const CabTalk = (() => {
       if (S.pc >= L.pc) { S.pc -= L.pc; t.result = `Drafting the bill; ⭐${L.pc} political capital committed to whip the vote.`; }
       else { t.status = 'blocked'; t.result = `Not enough political capital (⭐${L.pc} needed) — the bill will wait.`; }
     }
-    if (k === 'tender') { t.tender = r.tender; t.rid = r.rid; t.result = 'Tender notice being prepared.'; }
+    if (k === 'tender') { t.tender = r.tender; t.rid = r.rid || UI.region; t.result = 'Tender notice being prepared.'; }
     if (k === 'review') { t.tab = r && r.tab; t.result = 'Preparing a paper with options.'; }
     if (k === 'measure') { t.status = 'in progress'; t.result = 'Measure started.'; }
     T().push(t);
@@ -108,7 +108,7 @@ const CabTalk = (() => {
       else { t.status = 'failed'; t.result = `${mi.name} presented the bill but it was <b>defeated ${yes}–${size - yes}</b> (${majority()} needed). You can try again yourself with amendments and negotiation.`; news(`${D ? D.title : L.name} defeated in parliament`); }
     }
     if (t.kind === 'tender' && t.status === 'assigned') {
-      const P = PROJECTS[t.tender]; let rid = t.rid;
+      const P = PROJECTS[t.tender]; let rid = REGIONS.some(x => x.id === t.rid) ? t.rid : (UI.region || REGIONS[0].id);
       if (buildBlock(t.tender, rid)) rid = (REGIONS.find(x => !buildBlock(t.tender, x.id)) || {}).id;
       if (!rid) { t.status = 'failed'; t.result = 'No suitable site was available.'; return; }
       const best = COMPANIES.filter(c => !c.shady).map(c => ({ c, q: clamp(c.quality + ((S.companies[c.id] || 50) - 50) * .3), price: Math.round(P.cost * c.price * 10) / 10 })).sort((x, y) => (y.q - y.price / P.cost * 40) - (x.q - x.price / P.cost * 40))[0];
@@ -130,13 +130,13 @@ const CabTalk = (() => {
   async function followUp() {
     const due = T().filter(t => t.turn < S.turn && !t.reported);
     if (!due.length) return;
-    due.forEach(execute);
+    due.forEach(t => { try { execute(t); } catch (e) { console.error(e); t.status = 'failed'; t.result = 'The ministry could not complete this — try it yourself.'; } });
     const rows = due.map(t => { const mi = Cabinet.get(t.min) || { name: '?', look: randomLook(), title: '' }; return `<div class="ct-up ${t.status}">${avatarSVG(mi.look, t.status === 'failed' ? -1 : 1, 40)}<div><b>${esc(t.label)}</b><small>${esc(mi.name)} · ${esc(mi.title)}</small><p>${{ done: '✅', failed: '❌', blocked: '⏸️', 'in progress': '🔄', assigned: '📝' }[t.status] || ''} ${t.result}${t.kind === 'measure' ? progressLine(t) : ''}</p>
       ${t.status === 'failed' && t.kind === 'law' ? `<button class="btn small" data-ctl="${t.law}">🏛️ Take the bill to parliament myself</button>` : ''}${t.kind === 'review' && t.tab ? `<button class="btn small" data-ctt="${t.tab}">Open the paper →</button>` : ''}</div></div>`; }).join('');
     await new Promise(res => {
       const m = modal(`<div class="m-icon">🤝</div><h2>Follow-up from ${esc(vpName())}</h2>
         <p class="m-body">“Here is where things stand on what cabinet agreed last time.”</p><div class="ct-ups">${rows}</div>
-        <p class="muted small">Ministers will also give these updates at the next cabinet meeting.</p><button class="btn primary big" id="m-ok">Thank you</button>`, 'wide');
+        <p class="muted small">Ministers will also give these updates at the next cabinet meeting.</p><button class="btn primary big" id="m-ok">Thank you</button>`, 'wide keep');
       $('#m-ok', m).onclick = () => { closeModal(); res(); };
       m.querySelectorAll('[data-ctl]').forEach(x => x.onclick = async () => { closeModal(); res(); UI.tab = 'laws'; render(); setTimeout(() => Legis.run(x.dataset.ctl), 50); });
       m.querySelectorAll('[data-ctt]').forEach(x => x.onclick = () => { closeModal(); res(); UI.tab = x.dataset.ctt; render(); });

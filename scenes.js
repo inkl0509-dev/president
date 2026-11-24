@@ -188,14 +188,30 @@ DRAW.office = (a, dt) => {
   const pc = partyById(S.player.party).color; sLine(cx + 190, 26, cx + 190, 170, '#cbd5e1', 3); sCirc(cx + 190, 26, 4, '#fbbf24');
   for (let i = 0; i < 10; i++) { const dy = Math.sin(t * 3 + i * .6) * 2 * (i / 10); sR(cx + 190 + i * 6, 30 + dy, 6.4, 40, pc); } sText('★', cx + 220, 56, 16, '#fff');
   // bookshelf & TV
-  const bx = cx - 380; sR(bx, 30, 120, 150, '#5b3a1e'); for (let r = 0; r < 4; r++) { sR(bx + 4, 36 + r * 36, 112, 3, '#3f2a14'); for (let b = 0; b < 12; b++) sR(bx + 8 + b * 9, 40 + r * 36 + (b % 3), 7, 28 - (b % 3), ['#7f1d1d', '#1e3a8a', '#14532d', '#a16207', '#4c1d95'][(b + r) % 5]); }
+  const bx = cx - 420; sR(bx, 30, 120, 150, '#5b3a1e'); for (let r = 0; r < 4; r++) { sR(bx + 4, 36 + r * 36, 112, 3, '#3f2a14'); for (let b = 0; b < 12; b++) sR(bx + 8 + b * 9, 40 + r * 36 + (b % 3), 7, 28 - (b % 3), ['#7f1d1d', '#1e3a8a', '#14532d', '#a16207', '#4c1d95'][(b + r) % 5]); }
   const tx = cx + 262; sR(tx, 40, 140, 82, '#0f172a'); sR(tx + 4, 44, 132, 74, '#1e3a8a');
   sR(tx + 4, 44, 132, 14, '#b91c1c'); sText('● LIVE NEWS', tx + 10, 55, 8, '#fff', 800, 'left');
   const head = (S.news && S.news[0]) || 'Welcome to the office'; const hl = sWrap(head, 120, 9);
   hl.slice(0, 3).forEach((l, i) => sText(l, tx + 70, 74 + i * 12, 9, '#f8fafc', 700));
   sR(tx + 60, 122, 20, 18, '#334155');
-  // clock
-  sCirc(cx + 300, 160, 0, '#000');
+  // wall calendar (month and year) and wall clock — the game's date and time
+  if (S.phase === 'govern') {
+    const mi = (S.turn % 2 ? 0 : 6) + Clock.month(), yr = 2026 + Math.ceil(S.turn / 2), kx = cx - 286, ky = 24, kw = 86, kh = 108;
+    sR(kx + 3, ky + 4, kw, kh, 'rgba(0,0,0,.2)'); sR(kx, ky, kw, kh, '#fff'); sR(kx, ky, kw, 28, '#b91c1c');
+    sCirc(kx + 22, ky, 4, '#475569'); sCirc(kx + kw - 22, ky, 4, '#475569');
+    sText(MONTHS[mi].toUpperCase(), kx + kw / 2, ky + 20, 15, '#fff', 800);
+    sText(String(yr), kx + kw / 2, ky + 56, 26, '#0f172a', 900);
+    const done = Math.floor(((S.clk || 0) % SEC_PER_MONTH) / SEC_PER_MONTH * 28);
+    for (let d = 0; d < 28; d++) { const gx = kx + 8 + (d % 7) * 10.3, gy = ky + 68 + Math.floor(d / 7) * 9; sR(gx, gy, 8, 6, d < done ? '#ef4444' : '#cbd5e1'); }
+    const [hh, mm] = Clock.hm(), ox = cx + 226, oy = 122, rr = 30;
+    sCirc(ox, oy + 3, rr + 4, 'rgba(0,0,0,.2)'); sCirc(ox, oy, rr + 4, '#78350f'); sCirc(ox, oy, rr, '#fffbeb');
+    for (let i = 0; i < 12; i++) { const an = i / 12 * Math.PI * 2; sLine(ox + Math.sin(an) * (rr - 6), oy - Math.cos(an) * (rr - 6), ox + Math.sin(an) * (rr - 2), oy - Math.cos(an) * (rr - 2), '#334155', i % 3 ? 1.5 : 3); }
+    const ha = ((hh % 12) + mm / 60) / 12 * Math.PI * 2, ma = mm / 60 * Math.PI * 2;
+    sLine(ox, oy, ox + Math.sin(ha) * rr * .5, oy - Math.cos(ha) * rr * .5, '#0f172a', 4);
+    sLine(ox, oy, ox + Math.sin(ma) * rr * .8, oy - Math.cos(ma) * rr * .8, '#0f172a', 2.5);
+    sCirc(ox, oy, 3, '#b91c1c');
+    sR(ox - 24, oy + rr + 8, 48, 16, '#0f172a'); sText(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, ox, oy + rr + 20, 12, '#4ade80', 800);
+  }
   // aide walking in with papers
   st.aide = st.aide || { x: vw + 40, ph: 'wait', w: 3 };
   const ai = st.aide;
