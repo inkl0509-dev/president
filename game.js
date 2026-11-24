@@ -806,6 +806,7 @@ async function turnStart() {
   if (!S || S.phase !== 'govern' || !S.pendingEvent) return;
   Qual.onGovern();
   await Targets.choose();
+  await CabTalk.followUp();
   let ev;
   if (debtPct() > (S.crisisAt || 120) && !(S.crisisTurn && S.turn - S.crisisTurn < 4)) { ev = DEBT_EVENT; S.crisisTurn = S.turn; }
   else {
@@ -838,6 +839,7 @@ async function endTurn() {
   try {
     const a0 = approval(), r = simulateTurn(), a1 = approval();
     r.msgs.push(...Money.step(r), ...TBills.step(), ...Mega.step(), ...Resorts.step(), ...Targets.step(), ...Advisers.step(), ...Oil.step(), ...Presser.checkPromises());
+    Concerns.record();
     say(a1 >= a0 ? 'Good news this half-year.' : 'Tough months. We must do better.');
     S.diploThisTurn = false;
     render();

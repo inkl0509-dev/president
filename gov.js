@@ -423,19 +423,29 @@ const Cabinet = (() => {
           const table = `<svg viewBox="0 0 600 150" class="cab-table"><ellipse cx="300" cy="104" rx="236" ry="40" fill="#5b3a1e"/><ellipse cx="300" cy="100" rx="228" ry="35" fill="#7c4a24"/>
             ${seats.map(s2 => `<g transform="translate(${s2.x - 14},${s2.y - 20}) scale(.24)">${avatarInner(s2.c.look, 0)}</g>`).join('')}
             <g transform="translate(286,110) scale(.26)">${avatarInner(S.player.look, 1)}</g><text x="300" y="148" class="cab-you">You</text></svg>`;
-          const m = modal(`<div class="scene-title">🏛️ Cabinet meeting · ${turnLabel()}</div><canvas id="cab-cv" class="scene-cv cab-cv"></canvas><p class="m-body small">${S.cabinet.length} ministers present. Most urgent briefings first — hover a card to hear that minister. Each minister's advice can be adopted once per half-year.</p>
-            <div class="cab-list">${list.map(b => { const mi = get(b.id); return `<div class="cab ${b.st}"><div class="cab-h">${avatarSVG(mi.look, b.st === 'red' ? -1 : b.st === 'green' ? 1 : 0, 46)}<div><b>${mi.icon} ${esc(mi.name)}</b><small>${esc(mi.title)}${mi.party !== S.player.party ? ` · <span style="color:${partyById(mi.party).color}">${partyById(mi.party).name}</span>` : ''}</small></div><span class="dot ${b.st}"></span></div>
+          const m = modal(`<div class="scene-title">🏛️ Cabinet meeting · ${turnLabel()}</div><canvas id="cab-cv" class="scene-cv cab-cv"></canvas><p class="m-body small">${S.cabinet.length} ministers present. Most urgent briefings first — hover a card to hear that minister. Tap a proposal to discuss it: question the minister, then agree, ask for a revision, or decline. Agreed decisions are carried out by the minister.</p>
+            ${CabTalk.updatesHTML()}<div class="cab-list">${list.map(b => { const mi = get(b.id); return `<div class="cab ${b.st}"><div class="cab-h">${avatarSVG(mi.look, b.st === 'red' ? -1 : b.st === 'green' ? 1 : 0, 46)}<div><b>${mi.icon} ${esc(mi.name)}</b><small>${esc(mi.title)}${mi.party !== S.player.party ? ` · <span style="color:${partyById(mi.party).color}">${partyById(mi.party).name}</span>` : ''}</small></div><span class="dot ${b.st}"></span></div>
               <p>${b.text}</p><details><summary>📘 Why it matters</summary><p>${b.learn}</p></details>
-              <div class="cab-acts">${done.includes(b.id) ? '<span class="good small">✓ Advice adopted</span>' : b.acts.map((a, j) => `<button class="btn small" data-b="${b.id}" data-j="${j}">${a.label}</button>`).join('') || '<span class="muted small">No action needed.</span>'}</div></div>`; }).join('')}</div>
+              <div class="cab-acts">${done.includes(b.id) ? '<span class="good small">✓ Discussed this meeting</span>' : b.acts.map((a, j) => `<button class="btn small" data-b="${b.id}" data-j="${j}">💬 ${a.label}</button>`).join('') || '<span class="muted small">No action needed.</span>'}</div></div>`; }).join('')}</div>
             <div class="center cab-end"><button class="btn big" id="cab-loan">💳 Discuss bank loans & financing</button><button class="btn primary big" id="cab-x">End meeting</button></div>`, 'cab-card');
           let speaker = list[0] && list[0].id, spoke = 0;
           const lineOf = id => { const b2 = list.find(x => x.id === id); return b2 ? b2.text.replace(/<[^>]+>/g, '').split('. ')[0] + '.' : ''; };
           Scenes.modal.attach($('#cab-cv', m), 'cabinet', { ministers: S.cabinet, speaker: () => speaker, line: () => lineOf(speaker) }, 260);
           const cyc = setInterval(() => { if (!m.isConnected || !$('#cab-cv')) return clearInterval(cyc); spoke = (spoke + 1) % Math.min(5, list.length); speaker = list[spoke].id; }, 4500);
           m.querySelectorAll('.cab').forEach((el, i) => el.onmouseenter = () => { speaker = list[i].id; });
-          m.querySelectorAll('[data-b]').forEach(btn => btn.onclick = () => {
+          m.querySelectorAll('[data-b]').forEach(btn => btn.onclick = async () => {
             const b = list.find(x => x.id === btn.dataset.b), a = b.acts[+btn.dataset.j];
+            const dec = await CabTalk.discuss(b, a);
+            if (dec.d === 'no') return draw();
+            if (dec.d === 'revise') { CabTalk.revise(b, a); done.push(b.id); toast(`${get(b.id).name} will bring a revised proposal`, ''); save(); return draw(); }
             const before = Impact.snap(), r = a.fn(); done.push(b.id);
+            if (dec.d === 'agree') {
+              CabTalk.assign(b, a, r, dec.k);
+              (S.agenda = S.agenda || []).push({ turn: S.turn, min: b.id, label: a.label.replace(/\s*\(.*\)$/, ''), law: r && r.law, tender: r && r.tender, base: r && r.tender ? count(r.tender) : undefined });
+              toast(`✅ Agreed — ${get(b.id).name} will carry it out`, 'good'); save();
+              if (!(r && (r.law || r.tender || r.tab))) setTimeout(() => Impact.show(`Cabinet: ${a.label.replace(/\s*\(.*\)$/, '')}`, before, { lesson: 'Cabinet decides together; the responsible minister then carries out the decision and reports back.' }), 50);
+              return draw();
+            }
             (S.agenda = S.agenda || []).push({ turn: S.turn, min: b.id, label: a.label.replace(/\s*\(.*\)$/, ''), law: r && r.law, tender: r && r.tender, base: r && r.tender ? count(r.tender) : undefined });
             news(`Cabinet adopts ${get(b.id).title.toLowerCase()}'s proposal: ${a.label.replace(/\(.*\)/, '').trim()}`);
             toast(`Adopted: ${a.label}`, 'good'); save();
@@ -810,5 +820,5 @@ const Legis = (() => {
   }
   function adj(L, pid, o) { let a = 0; if (o.amend && lean(L, pid) < .1 && pid !== S.player.party) a += .15; if (o.lobby && pid !== S.player.party) a += .07; return a; }
   function expectedVotes(L, o) { return PARTIES.reduce((s2, p) => s2 + (S.parl.seats[p.id] || 0) * Math.min(.98, voteProb(L, p.id) + adj(L, p.id, o)), 0); }
-  return { run };
+  return { run, expectedVotes };
 })();

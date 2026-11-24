@@ -1,3 +1,4 @@
+var TenderReview_helpOpen = false;
 /* ============================================================
    FULL TENDER REVIEW — you sit as chair of the Tender
    Evaluation Committee for one project:
@@ -69,6 +70,28 @@ const TenderReview = (() => {
     return { issues, ev, verify, should, arith };
   }
   const lbl = { ok: '✓ Accept', clarify: '❓ Clarify', reject: '✗ Reject' };
+  // what happens when the committee sends a written clarification request
+  function clarify(b, d) {
+    const i = b.file.issues[d.id], ask = {
+      form: 'Please confirm that the person who signed is authorised, and send the board resolution.',
+      security: 'Please confirm the bid security details.', reg: 'Please confirm your registration number.', tax: 'Please confirm your tax status.',
+      fin: 'Please explain the drop in turnover in the second year.', exp: 'Please send contact details of the clients for your listed contracts.',
+      staff: 'Please submit the CV of the site engineer named in your bid.', method: 'Please clarify how the schedule deals with the rainy season.',
+      equip: 'Please submit letters of commitment for the equipment you will hire.', bo: 'Please confirm the owners of the company.' }[d.id];
+    const req = `📨 <b>Request sent:</b> “${ask} Reply within 5 working days. You may not change your price or the substance of your bid.”`;
+    if (i && i.kind === 'minor') return { mark: 'ok', html: `${req}<br>📩 <b>Reply:</b> the missing CV arrives — site engineer, ${Math.round(rnd(7, 14))} years, chartered. ✅ <b>Gap closed — document accepted.</b>` };
+    if (d.id === 'equip' && /no commitment letters/.test(b.file.ev.equip)) return { mark: 'ok', html: `${req}<br>📩 <b>Reply:</b> signed letters of commitment from two plant-hire companies. ✅ <b>Accepted.</b>` };
+    if (i && i.kind === 'weak') return { mark: 'ok', html: `${req}<br>📩 <b>Reply:</b> a short note, but a new method cannot be accepted after the deadline. ✅ Accept the document and <b>score it low</b> in the technical evaluation instead.` };
+    if (i && i.hidden) return { mark: 'ok', html: `${req}<br>📩 <b>Reply:</b> “We confirm the document is genuine.” ⚠️ A bidder's own word is not proof — if something looks wrong, <b>☎️ verify it with the issuer</b>.` };
+    if (i && i.kind !== 'minor') return { mark: 'clarify', html: `${req}<br>📩 <b>Reply:</b> the bidder offers to send a ${d.id === 'security' ? 'new or larger guarantee' : d.id === 'tax' ? 'renewed certificate' : 'replacement document'} now.<br>⛔ <b>Not allowed:</b> a <b>material</b> defect cannot be fixed after the bid deadline — that would let one bidder improve its bid after seeing the others. <b>You should mark it ✗ Reject.</b>` };
+    return { mark: 'ok', html: `${req}<br>📩 <b>Reply:</b> the bidder confirms the document as submitted — nothing was missing. ✅ <b>Accepted.</b> (Unneeded requests slow the tender down; only ask when something is genuinely unclear.)` };
+  }
+  const HELP = () => `<details class="tr-help" ${TenderReview_helpOpen ? 'open' : ''} ontoggle="TenderReview_helpOpen=this.open"><summary>❓ How do I decide? What does “Clarify” mean?</summary>
+    <ul><li><b>✓ Accept</b> — the document is complete, valid and matches the requirement.</li>
+    <li><b>❓ Clarify</b> — something <b>minor</b> is missing or unclear (a missing CV, an unsigned page, a figure that needs explaining). The committee sends a written request; the bidder must reply within a few days. Rule: the bidder may <b>explain or complete</b>, but may <b>not change the price or the substance</b> of the bid. If the reply fixes it, the document is accepted.</li>
+    <li><b>✗ Reject</b> — a <b>material</b> defect: no or too small bid security, a forged document, an expired or missing tax certificate, not enough experience, no ownership declaration. Material defects <b>cannot</b> be fixed by clarification — the bid is non-responsive.</li>
+    <li><b>☎️ Verify</b> — call the issuing bank, registry, tax office or past client when a document looks suspicious. Real committees do this before awarding.</li></ul>
+    <p>What normally happens: the committee records every decision in the evaluation report, sends all clarification letters in writing (copies to the file), and treats every bidder the same way.</p></details>`;
 
   async function run(bids, est, P, r, ref, STEPS) {
     bids.forEach(b => { b.file = dossier(b, est, P); b.mark = {}; b.ver = {}; });
@@ -78,18 +101,20 @@ const TenderReview = (() => {
       const draw = () => {
         const b = bids[cur], f = b.file, done = bids.every(x => DOCS.every(d => x.mark[d.id]));
         const html = `${stepsBar(STEPS, 3)}<div class="tr"><h2>🔍 Document check — Ref. ${esc(ref)}</h2>
-          <p class="m-body small">You chair the Tender Evaluation Committee. Open each bidder's file and decide on every document. A <b>material</b> defect (bid security, tax, registration, experience, ownership) makes the bid <b>non-responsive</b>. Minor gaps can be fixed by a clarification request — but bidders may not change their price. Use ☎️ to verify suspicious documents.</p>
+          <p class="m-body small">You chair the Tender Evaluation Committee. Open each bidder's file and decide on every document. A <b>material</b> defect (bid security, tax, registration, experience, ownership) makes the bid <b>non-responsive</b>. Minor gaps can be fixed by a clarification request — but bidders may not change their price. Use ☎️ to verify suspicious documents.</p>${HELP()}
           <div class="tr-tabs">${bids.map((x, i) => { const n = DOCS.filter(d => x.mark[d.id]).length; return `<button class="${i === cur ? 'on' : ''}" data-b="${i}">${x.c.icon} ${esc(x.c.name)} <small>${n}/${DOCS.length}</small></button>`; }).join('')}</div>
           <div class="tr-docs">${DOCS.map(d => { const m = b.mark[d.id], v = b.ver[d.id];
             return `<div class="tr-doc ${m || ''}"><div class="tr-dn"><b>${d.name}</b>${d.material ? '<span class="tr-mat">material</span>' : '<span class="tr-min">minor</span>'}</div>
               <div class="tr-ev">${f.ev[d.id]}${v ? `<div class="tr-ver">${v}</div>` : ''}</div>
-              <div class="tr-act">${d.verify && !v ? `<button class="btn small" data-v="${d.id}">☎️ Verify</button>` : ''}${['ok', 'clarify', 'reject'].map(k => `<button class="btn small ${m === k ? 'primary' : ''}" data-m="${d.id}" data-k="${k}">${lbl[k]}</button>`).join('')}</div></div>`; }).join('')}</div>
+              <div class="tr-act">${d.verify && !v ? `<button class="btn small" data-v="${d.id}">☎️ Verify</button>` : ''}${['ok', 'clarify', 'reject'].map(k => `<button class="btn small ${m === k ? 'primary' : ''}" data-m="${d.id}" data-k="${k}">${lbl[k]}</button>`).join('')}</div>${b.clar && b.clar[d.id] ? `<div class="tr-clar">${b.clar[d.id]}</div>` : ''}</div>`; }).join('')}</div>
           <div class="tr-sum">Status of ${esc(b.c.name)}: ${DOCS.some(d => b.mark[d.id] === 'reject' && d.material) ? '<b class="bad">Non-responsive (material defect)</b>' : DOCS.every(d => b.mark[d.id]) ? '<b class="good">Responsive</b>' : '<span class="muted">review in progress</span>'}</div>
           ${edu('Bid evaluation starts with a pass/fail check of documents. Committees must apply the published rules to every bidder in the same way — rejecting a good bid for a trivial reason is as wrong as accepting a forged guarantee.')}
           <div class="doc-actions"><button class="btn" id="tr-auto">Let the committee finish</button><button class="btn primary" id="tr-next" ${done ? '' : 'disabled'}>Continue → price check</button></div></div>`;
         const m = modal(html, 'wide');
         m.querySelectorAll('[data-b]').forEach(x => x.onclick = () => { cur = +x.dataset.b; draw(); });
-        m.querySelectorAll('[data-m]').forEach(x => x.onclick = () => { b.mark[x.dataset.m] = x.dataset.k; if (DOCS.every(d => b.mark[d.id]) && cur < bids.length - 1 && !bids[cur + 1].touched) { bids[cur + 1].touched = true; } draw(); });
+        m.querySelectorAll('[data-m]').forEach(x => x.onclick = () => {
+          if (x.dataset.k === 'clarify') { const d = DOCS.find(y => y.id === x.dataset.m), c = clarify(b, d); b.clar = b.clar || {}; b.clar[d.id] = c.html; b.mark[d.id] = c.mark; return draw(); }
+          b.mark[x.dataset.m] = x.dataset.k; if (DOCS.every(d => b.mark[d.id]) && cur < bids.length - 1 && !bids[cur + 1].touched) { bids[cur + 1].touched = true; } draw(); });
         m.querySelectorAll('[data-v]').forEach(x => x.onclick = () => { const d = DOCS.find(y => y.id === x.dataset.v); b.ver[d.id] = f.verify[d.verify]; b.verified = (b.verified || 0) + 1; draw(); });
         $('#tr-auto', m).onclick = () => { bids.forEach(x => DOCS.forEach(d => { if (!x.mark[d.id]) x.mark[d.id] = x.file.should[d.id]; })); res(); };
         $('#tr-next', m).onclick = () => res();

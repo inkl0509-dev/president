@@ -123,9 +123,21 @@ The **Advisers** button in the office opens your personal team (separate from mi
 
 A red dot means an adviser wants to see you; the assistant reminds you too. Legal answers are simplified explanations for learning.
 
+## 👔 Cabinet meetings: discuss, decide, delegate
+
+Tap a minister's proposal to **discuss it without leaving the meeting**. Ask: what will it cost, how long will it take, what are the risks and who will be unhappy, what are the alternatives, what does the Finance Minister think, and what result do you expect and how will we measure it — every answer uses the real figures. Then decide: **agree** (the minister carries it out), ask for a **revised proposal** at the next meeting, **handle it yourself** (leaves the meeting for the full law or tender process), or **not now**.
+
+Agreed decisions are the minister's job: bills are drafted and put to parliament (political capital is committed; the vote happens early next half-year), tenders are run by the ministry's committee and the contract signed, budget measures start at once. At the start of the next half-year the **vice president** (or chief of staff) reports what happened — passed or defeated, who won the tender, how the figures moved — and ministers repeat the updates at the next cabinet meeting.
+
+## 🔍 Tender review: what "Clarify" means
+
+The document check now has a **How do I decide?** guide. ✓ Accept complete, valid documents; ❓ Clarify sends a written request for a *minor* gap (a missing CV, missing equipment commitment letters) — the bidder replies within days and the document is accepted, but may not change its price or substance; ✗ Reject material defects (bid security, forged or expired documents, experience, ownership), which can never be fixed by clarification; ☎️ Verify with the issuer when something looks suspicious. Each clarification shows the letter sent and the bidder's reply.
+
 ## 🎙️ Press conferences and 🏛️ question time
 
 **Press conference** (🎙️ Press in the office, once per half-year). Choose up to 3 ministers to stand with you. Journalists ask about the country's real current concerns — deficit, debt, prices, jobs, dollar shortage, scandals, hospitals, schools, housing, crime, power cuts, environment, late megaprojects, islands leased without bidding, today's headline. For each question: answer honestly, defend the government, promise quick action (checked next half-year — broken promises cost trust), or ask a minister on stage to answer (their skill and whether it is their area decide how well it goes).
+
+Questions are aimed at the ministers you bring — each minister on stage gets at least one question on their own area — and rotate: recently asked topics are pushed back, the wording changes, and journalists follow up ("last time it was X, now it is Y — what changed?"). Good answers give the real figures, the causes, numbered steps with costs, and a target with a date (e.g. "cut the deficit to 2.5% of GDP by Jan–Jun 2029"); weak ministers give vague answers or get the numbers wrong.
 
 **Question time** (Parliament tab, once per half-year). The Speaker opens the session and opposition MPs question the responsible ministers. The minister can give the facts and a plan, attack the opposition's record, or promise a report to the committee. Ministers who keep answering badly face a **motion of no confidence**: defend them (you need a majority) or ask them to resign.
 
@@ -305,6 +317,7 @@ advisers.js       the president's personal advisers and the president's own heal
 qa.js             press conferences and parliamentary question time (built from current concerns)
 oil.js            oil & gas exploration, contracts and the wealth fund
 debateq.js        larger debate question pool, country questions, no repeats
+cabtalk.js        cabinet discussion, delegated decisions and the vice president's follow-up
 mega.js           megaprojects: feasibility, EIA, financing, tender, monitored construction
 local.js          country-specific voter groups and events (farmers' protests, fishers, strikes…)
 manifest.webmanifest, icons/  app name and icons
