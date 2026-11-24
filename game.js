@@ -477,7 +477,7 @@ function electionNight() {
   S.phase = 'election'; UI.screen = 'election'; UI.revealed = 0;
   news('Polls are closed. The counting begins!');
   save(); render();
-  const step = () => { if (UI.screen !== 'election') return; UI.revealed++; render(); if (UI.revealed < S.elec.order.length) setTimeout(step, 1200); else if (electionTotals().win && !electionTotals().runoff) Confetti.burst(260); };
+  const step = () => { if (UI.screen !== 'election') return; UI.revealed++; render(); Sound.play('drum'); if (UI.revealed < S.elec.order.length) setTimeout(step, 1200); else if (electionTotals().win && !electionTotals().runoff) Confetti.burst(260); else if (!electionTotals().win && !electionTotals().runoff) setTimeout(() => Sound.play('lose'), 300); };
   setTimeout(step, 1000);
 }
 function electionTotals(n = S.elec.order.length) {
@@ -1589,12 +1589,14 @@ function openMenu() {
   const m = modal(`<div class="m-icon">☰</div><h2>Menu</h2><div class="choices">
     <button class="choice" id="mn-resume"><b>▶ Resume</b></button>
     <button class="choice" id="mn-title"><b>🏠 Save & go to title screen</b></button>
+    <button class="choice" id="mn-sound"><b>🔊 Sound & music</b><span class="fx">Sound effects ${Sound.pref().fx ? 'on' : 'off'} · music ${Sound.pref().music ? 'on' : 'off'}</span></button>
     <button class="choice" id="mn-gloss"><b>📖 Key terms glossary</b><span class="fx">GDP, deficit, debt, inflation, reserves, majority… explained simply</span></button>
     <button class="choice" id="mn-school"><b>📘 Finance School</b><span class="fx">Lessons & quizzes: T-bills, currency swaps, bonds, reserves, inflation…</span></button>
     <button class="choice" id="mn-assist"><b>🧭 Assistant mode: ${Assistant.on() ? 'ON' : 'OFF'}</b><span class="fx">${Assistant.on() ? 'Tap to hide the Chief of Staff and all guidance' : 'Tap to get step-by-step guidance on running the country'}</span></button>
     ${PWA.canShow() ? '<button class="choice" id="mn-inst"><b>📲 Install as an app</b><span class="fx">Home-screen icon, full screen, works offline</span></button>' : ''}
     ${S && S.phase !== 'over' ? '<button class="choice" id="mn-quit"><b>🗑️ Abandon this game</b><span class="fx">Deletes your saved progress</span></button>' : ''}</div>`);
   $('#mn-resume', m).onclick = closeModal;
+  $('#mn-sound', m).onclick = () => { closeModal(); Sound.panel(); };
   $('#mn-gloss', m).onclick = () => { closeModal(); Qual.glossary(); };
   $('#mn-school', m).onclick = () => { closeModal(); School.open(); };
   $('#mn-assist', m).onclick = () => { closeModal(); Assistant.set(!Assistant.on()); };

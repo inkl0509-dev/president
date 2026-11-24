@@ -123,6 +123,14 @@ The **Advisers** button in the office opens your personal team (separate from mi
 
 A red dot means an adviser wants to see you; the assistant reminds you too. Legal answers are simplified explanations for learning.
 
+## 🔊 Sound
+
+All sounds are synthesised live with the Web Audio API — no audio files, so they work offline and in the installed app. Effects: button clicks, tab switches, a chime at the end of each turn, success and warning tones, coins for money coming in, a drum roll as election results come in, a fanfare and applause for victories and new laws, crowd cheers at rallies, camera shutters at press conferences, the Speaker's gavel at question time, and alarms for spills or no-confidence motions. Optional calm background music (it turns darker when approval is low). Use the 🔊 button in the top bar or ☰ → Sound & music; settings are remembered.
+
+### 🎺 Anthems at state visits
+
+On a state visit the military band plays your country's anthem, then the host's, as in real protocol (a 🔇 Stop button is shown). Included as melodies: the anthems whose music is in the public domain — *The Star-Spangled Banner* (USA), *God Save the King* (UK) and *La Marseillaise* (France). The fictional Republic of Veloria has an original anthem composed for the game. Other countries (including the Maldives, whose anthem's music is still under copyright) get original ceremonial band music. More public-domain anthems can be added in `anthem.js`.
+
 ## 👔 Cabinet meetings: discuss, decide, delegate
 
 Tap a minister's proposal to **discuss it without leaving the meeting**. Ask: what will it cost, how long will it take, what are the risks and who will be unhappy, what are the alternatives, what does the Finance Minister think, and what result do you expect and how will we measure it — every answer uses the real figures. Then decide: **agree** (the minister carries it out), ask for a **revised proposal** at the next meeting, **handle it yourself** (leaves the meeting for the full law or tender process), or **not now**.
@@ -317,6 +325,8 @@ advisers.js       the president's personal advisers and the president's own heal
 qa.js             press conferences and parliamentary question time (built from current concerns)
 oil.js            oil & gas exploration, contracts and the wealth fund
 debateq.js        larger debate question pool, country questions, no repeats
+sound.js          synthesised sound effects and background music
+anthem.js         anthems and ceremonial music for state visits
 cabtalk.js        cabinet discussion, delegated decisions and the vice president's follow-up
 mega.js           megaprojects: feasibility, EIA, financing, tender, monitored construction
 local.js          country-specific voter groups and events (farmers' protests, fishers, strikes…)

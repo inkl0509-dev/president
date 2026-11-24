@@ -595,7 +595,10 @@ const Diplomacy = (() => {
     const name = NATIONS[code];
     await new Promise(res => {
       const m = modal(`<div class="scene-title">${Flags.svg(code, 22)} State visit to ${name}</div><canvas id="scene-cv" class="scene-cv"></canvas>
-        <div id="vis-panel" class="debate-panel"><div class="dwait">✈️ Arriving… guard of honour, national anthems…</div></div>`, 'scene-card');
+        <div id="vis-panel" class="debate-panel"><div class="dwait">✈️ Arriving… guard of honour, national anthems…</div></div><div class="anthem-bar" id="anthem-bar"></div>`, 'scene-card');
+      const band = typeof Anthem !== 'undefined' ? Anthem.visit(code, name) : null;
+      if (band) { const bar = $('#anthem-bar', m); bar.innerHTML = `<span>${band.lines.join(' · then ')}</span>${Sound.pref().fx ? '<button class="btn small ghost" id="anthem-stop">🔇 Stop</button>' : '<small>(sound is off)</small>'}`; const st0 = $('#anthem-stop', m); if (st0) st0.onclick = () => { band.stop(); bar.remove(); }; }
+      const stopBand = () => { if (band) band.stop(); };
       Scenes.modal.attach($('#scene-cv', m), 'bilateral', { code, name, st }, 400);
       setTimeout(() => {
         st.talks = true;
@@ -605,7 +608,7 @@ const Diplomacy = (() => {
           const d = DEALS[b.dataset.d]; d.fx(k()); S.rep = clamp((S.rep || 50) + 2);
           st.sign = Scenes.modal.api.t; st.caption = `${d.label.replace(/^\S+\s/, '').toUpperCase()} SIGNED`;
           $('#vis-panel', m).innerHTML = `<div class="memo"><div class="memo-h">JOINT STATEMENT</div><p>${esc(S.country)} and ${name} agreed to ${d.text}. Ministers will meet within six months to implement the agreement.</p></div><div class="center"><button class="btn primary big" id="vis-ok">Fly home</button></div>`;
-          $('#vis-ok', m).onclick = () => { closeModal(); res(); };
+          $('#vis-ok', m).onclick = () => { stopBand(); closeModal(); res(); };
         });
       }, 5200);
     });

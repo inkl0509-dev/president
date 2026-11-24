@@ -955,3 +955,12 @@ b.warn { color: #fbbf24; }
 .ct-mtg summary { cursor: pointer; font-weight: 700; min-height: 32px; display: flex; align-items: center; }
 .ct-line { margin: 4px 0; }
 .tr-doc .tr-clar { grid-column: 1 / -1; }
+
+/* ---------- sound ---------- */
+#snd-btn { margin-right: 6px; }
+.snd-rows { display: grid; gap: 8px; margin: 12px 0; text-align: left; }
+.snd-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(148,163,184,.1); min-height: 44px; cursor: pointer; }
+.snd-row small { display: block; opacity: .7; font-size: 12px; }
+.snd-row input[type=checkbox] { width: 24px; height: 24px; }
+.snd-row input[type=range] { width: 50%; }
+.anthem-bar { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; font-size: 13px; padding: 6px; margin-top: 6px; border-radius: 10px; background: rgba(251,191,36,.12); }
