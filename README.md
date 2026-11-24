@@ -123,6 +123,10 @@ The **Advisers** button in the office opens your personal team (separate from mi
 
 A red dot means an adviser wants to see you; the assistant reminds you too. Legal answers are simplified explanations for learning.
 
+## 📱 Layout
+
+The game clock (month and year, pause / play / fast) sits in the top bar. The **End half-year** (or **End week**) button is the first, full-width button under the city view, and on phones all action buttons are shown in a grid — nothing hides off the side of the screen.
+
 ## 📖 How to play & tips
 
 Shown once before your first game ("Before you start"), and any time from the title screen, the setup screen or ☰ → How to play. Five tabs: **How to play** (the flow from candidate to retirement), **Win the election** (how the vote is decided in your country, what each campaign action does and costs, promises, attack-ad backfire, the debate, running mates), **Campaign money** (start $30M, +$3M a week, fundraisers +$12M, the legal spending limit — $45M, $60M in the US — and what happens if you overspend or take the tycoon's illegal donation: the post-election audit, a fine and scandal risk), **Governing tips** (cabinet, budget and debt crisis, targets, the 25% impeachment line, tenders, advisers, press) and **Stars**.

@@ -111,7 +111,7 @@ const Clock = {
   html() {
     const sp = this.speed(), b = (v, i, t) => `<button class="${sp === v ? 'on' : ''}" data-act="speed" data-id="${v}" title="${t}">${i}</button>`;
     return `<div class="clock ${sp ? '' : 'paused'}" id="clock" title="Game time: 2 minutes = 1 month. The half-year ends automatically after June/December — or end it now with the button.">
-      <div class="clk-d">📅 <b id="clk-m">${this.label()}</b></div>
+      <div class="clk-d">📅 <b id="clk-m">${this.label()}</b><b id="clk-ms" class="clk-short">${this.label().replace(/^(\w{3})\w*/, '$1')}</b></div>
       <div class="clk-bar">${'<i class="tick"></i>'.repeat(5)}<i class="fill" id="clk-f" style="width:${(S.clk || 0) / (SEC_PER_MONTH * 6) * 100}%"></i></div>
       <div class="clk-s">${b(0, '⏸', 'Pause')}${b(1, '▶', 'Normal: 2 min = 1 month')}${b(3, '⏩', 'Fast: 40 s = 1 month')}</div></div>`;
   },
@@ -119,6 +119,7 @@ const Clock = {
 function paintClock() {
   const m = $('#clk-m'), f = $('#clk-f'), c = $('#clock');
   if (m) m.textContent = Clock.label();
+  const ms = $('#clk-ms'); if (ms) ms.textContent = Clock.label().replace(/^(\w{3})\w*/, '$1');
   if (f) f.style.width = `${(S.clk || 0) / (SEC_PER_MONTH * 6) * 100}%`;
   if (c) { c.classList.toggle('paused', !Clock.speed() || !!S.pendingEvent || !!$('#modal.open')); c.querySelectorAll('[data-act=speed]').forEach(x => x.classList.toggle('on', +x.dataset.id === Clock.speed())); }
 }
@@ -959,14 +960,15 @@ async function loadCloud() {
 // ---------- rendering ----------
 function chip(icon, text, cls = '') { return `<span class="tchip ${cls}">${icon} ${text}</span>`; }
 function renderTop() {
-  const t = $('#topstats');
+  const t = $('#topstats'), tc = $('#topclock');
+  if (tc) { const on = S && S.phase === 'govern' && S.ga && UI.screen === 'govern'; tc.innerHTML = on ? Clock.html() : ''; tc.classList.toggle('on', !!on); }
   if (!S || UI.screen === 'title' || UI.screen === 'setup' || UI.screen === 'hall' || UI.screen === 'online') { t.innerHTML = ''; return; }
   if (S.phase === 'campaign' && S.camp) {
     const c = S.camp;
     t.innerHTML = chip('🗓️', `Week ${c.week}/${c.weeks}`) + chip('💵', `$${Math.round(c.funds)}M`) + chip('⚡', `${c.ap} actions`);
   } else if (S.ga && S.phase === 'govern') {
     const a = approval();
-    t.innerHTML = chip('🗓️', turnLabel()) + chip('👍', fmt(a) + '%', a < 35 ? 'bad' : a > 55 ? 'good' : '') + chip('🏦', bigMoney(gdpReal())) + chip('📉', `Debt ${fmt(debtPct())}%`, debtPct() > 100 ? 'bad' : '') + chip('💹', `Infl ${fmt(S.infl || 0, 1)}%`, (S.infl || 0) > (S.inflTarget || 3) + 3 ? 'bad' : '') + chip('⭐', `${S.pc} PC`);
+    t.innerHTML = chip('👍', fmt(a) + '%', a < 35 ? 'bad' : a > 55 ? 'good' : '') + chip('🏦', bigMoney(gdpReal())) + chip('📉', `Debt ${fmt(debtPct())}%`, debtPct() > 100 ? 'bad' : '') + chip('💹', `Infl ${fmt(S.infl || 0, 1)}%`, (S.infl || 0) > (S.inflTarget || 3) + 3 ? 'bad' : '') + chip('⭐', `${S.pc} PC`);
   } else t.innerHTML = '';
 }
 function renderTicker() {
@@ -1378,12 +1380,13 @@ function cityBar(camp) {
     const c = S.camp, r = reg(UI.region);
     return `<div class="cv-bar">
       <div class="cvb-info"><span class="ap">${'<i class="on"></i>'.repeat(c.ap)}${'<i></i>'.repeat(3 - c.ap)}</span><b>💵 $${Math.round(c.funds)}M</b><small class="muted">in ${r.short}</small></div>
+      <button class="btn primary cvb-end" data-act="endWeek">${c.week === c.weeks ? 'Election Day 🗳️' : 'End week →'}</button>
       ${Object.entries(CAMP_ACTIONS).map(([id, a]) => `<button class="cvb" data-act="camp" data-id="${id}" title="${a.desc}" ${c.ap <= 0 || c.funds < a.cost || (id === 'promise' && !promisesLeft()) ? 'disabled' : ''}><span>${a.icon}</span>${(n => n[0].toUpperCase() + n.slice(1))(a.name.replace('Make a ', '').replace('Hold a ', ''))}<small>${a.cost ? '$' + a.cost + 'M' : 'free'}</small></button>`).join('')}
-      <button class="cvb" data-act="manifesto"><span>📜</span>Manifesto<small>${(c.newPledges || []).length}/3 pledges</small></button>
-      <button class="btn primary cvb-end" data-act="endWeek">${c.week === c.weeks ? 'Election Day 🗳️' : 'End week →'}</button></div>`;
+      <button class="cvb" data-act="manifesto"><span>📜</span>Manifesto<small>${(c.newPledges || []).length}/3 pledges</small></button></div>`
   }
   return `<div class="cv-bar">
-    ${Clock.html()}<button class="cvb-info st-btn" data-act="stars" title="How to earn political capital"><b>⭐ ${S.pc} PC</b><small>how to earn?</small></button>
+    <button class="btn primary cvb-end" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish →' : 'End term →') : 'End half-year →'}</button>
+    <button class="cvb-info st-btn" data-act="stars" title="How to earn political capital"><b>⭐ ${S.pc} PC</b><small>how to earn?</small></button>
     <button class="cvb" data-act="cabinet" ${S.pendingEvent ? 'disabled' : ''}><span>👔</span>Cabinet<small>${S.cabinetDone && S.cabinetDone.turn === S.turn ? 'held' : 'briefings'}</small></button>
     <button class="cvb ${Experts.urgent().length ? 'alert' : ''}" data-act="experts" ${S.pendingEvent ? 'disabled' : ''} title="Ask economists, the central bank, the IMF, business and unions what to do"><span>🧠</span>Experts<small>${Experts.urgent().length ? Experts.urgent().length + ' issue' + (Experts.urgent().length > 1 ? 's' : '') : 'advice'}</small></button>
     <button class="cvb ${Advisers.urgent().length ? 'alert' : ''}" data-act="advisers" ${S.pendingEvent ? 'disabled' : ''} title="Your legal counsel, physician, foreign policy adviser, press secretary and more"><span>🧑‍💼</span>Advisers<small>${Advisers.urgent().length ? Advisers.urgent().length + ' want to see you' : 'lawyer · doctor · more'}</small></button>
@@ -1393,8 +1396,7 @@ function cityBar(camp) {
     <button class="cvb" data-act="speechPick" ${S.pc < 1 || S.pendingEvent ? 'disabled' : ''}><span>🎤</span>Speech<small>⭐1</small></button>
     <button class="cvb" data-act="foreign" ${S.pendingEvent ? 'disabled' : ''}><span>✈️</span>Foreign<small>${S.tripTurn === S.turn ? 'trip done' : 'UN · summits · visits'}</small></button>
     <button class="cvb" data-act="tab" data-id="parl" data-scroll="1"><span>🏛️</span>Parliament<small>${coalitionSeats()}/${S.parl.size || 100}</small></button>
-    <button class="cvb" data-act="tab" data-id="defense" data-scroll="1"><span>🛡️</span>Defense<small>risk ${warRisk()[0].toLowerCase()}</small></button>
-    <button class="btn primary cvb-end" data-act="endTurn" ${S.pendingEvent ? 'disabled' : ''}>${S.turn % TT() === 0 ? (S.term >= MAXT() ? 'Finish →' : 'End term →') : 'End half-year →'}</button></div>`;
+    <button class="cvb" data-act="tab" data-id="defense" data-scroll="1"><span>🛡️</span>Defense<small>risk ${warRisk()[0].toLowerCase()}</small></button></div>`;
 }
 function scrollToCity() {
   const el = $('.citycard'); if (!el || UI.pin !== false) return;
